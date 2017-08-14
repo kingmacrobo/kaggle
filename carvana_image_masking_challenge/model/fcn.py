@@ -1,16 +1,20 @@
+import os
+import sys
+import numpy as np
 import tensorflow as tf
 
 class FCN():
-    def __init__(self, batch_size=128, lr=0.0001, dropout=0.5):
+    def __init__(self, batch_size=128, lr=0.0001, dropout=0.5, model_dir='checkpoints'):
         self.batch_size = batch_size
         self.lr = lr
         self.dropout = dropout
+        self.model_dir = model_dir
 
     def conv2d(self, x, filter, scope, activation='relu'):
         with tf.variable_scope(scope):
             w = self.weight_variable(filter)
             b = self.bias_variable([filter[-1]])
-            x = tf.nn.conv2d(x, w, strides=[1, 1, 1, 1], padding='SAME')
+            x = tf.nn.conv2d(x, w, strides=[1, 1, 1, 1], padding='VALID')
             x = tf.nn.bias_add(x, b)
 
             if activation == 'sigmoid':
@@ -18,7 +22,7 @@ class FCN():
             return tf.nn.relu(x)
 
     def maxpooling(self, x, k=2):
-        return tf.nn.max_pool(x, ksize=[1, k, k, 1], strides=[1, k, k, 1], padding='SAME')
+        return tf.nn.max_pool(x, ksize=[1, k, k, 1], strides=[1, k, k, 1], padding='VALID')
 
     def weight_variable(self, shape):
         init = tf.truncated_normal(shape, stddev=1)
@@ -28,7 +32,7 @@ class FCN():
         init = tf.constant(0.1, shape=shape)
         return tf.Variable(init)
 
-    def fcn_net(self, x, y, train=True):
+    def fcn_net(self, x, train=True):
         conv1 = self.conv2d(x, [3, 3, 3, 32], 'conv1')
         maxp1 = self.maxpooling(conv1)
 
@@ -64,11 +68,17 @@ class FCN():
 
         return net
 
-    def train(self):
-        x = tf.placeholder(tf.float32, [None, 128, 128, 3])
-        y = tf.placeholder(tf.float32, [None, 128*128])
+    def train(self, session):
+        # train fcn
+        x = tf.placeholder(tf.float32, [self.batch_size, 128, 128, 3])
+        y = tf.placeholder(tf.float32, [self.batch_size, 128*128])
+        fcn = self.fcn_net(x)
 
-        fcn = self.fcn_net(x, y)
+        # evaluate fcn
+        tf.get_variable_scope().reuse_variables()
+        eval_x = tf.placeholder(tf.float32, [1, None, None, 3])
+        eval_y = tf.placeholder(tf.float32, [1, None, None])
+        eval_fcn = self.fcn_net(eval_x, train=False)
 
         # L1 distance loss
         loss = tf.reduce_mean(tf.abs(fcn-y))
@@ -76,6 +86,108 @@ class FCN():
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
         train_step = tf.train.AdamOptimizer(learning_rate=self.lr).minimize(loss, global_step=global_step)
+
+
+        saver = tf.train.Saver(max_to_keep=3)
+        session.run(tf.global_variables_initializer())
+
+        # restore the model
+        last_step = 0
+        if not os.path.exist(self.model_dir):
+            os.mkdir(self.model_dir)
+        ckpt = tf.train.get_checkpoint_state(self.model_dir)
+        if ckpt and ckpt.model_checkpoint_path:
+            last_step = int(ckpt.model_checkpoint_path.split('-')[-1])
+            saver.restore(session, self.model_dir)
+
+        for step in xrange(last_step, 10000000):
+            batch_x, batch_y = datagen.get_batch()
+            _, loss_out = session.run([train_step, loss], feed_dict={x: batch_x, y: batch_y})
+
+            if step % 10 == 0:
+                print 'step {}, loss {}'.format(step, loss_out)
+
+            if step != 0 and  step % 1000:
+                iou_acc = 0
+                eval_sample_count = datagen.get_eval_sample_count()
+                for _ in xrange(eval_sample_count):
+                    eval_one_x, eval_one_y = datagen.get_one_eval_sample()
+                    eval_out = session.run(eval_fcn, feed_dict={eval_x: eval_one_x})
+                    iou_acc = self.iou_accuracy(eval_out, eval_one_y)
+
+                avg_iou_acc = iou_acc/eval_sample_count
+                print "Validate IoU Accuracy: {}".format(avg_iou_acc)
+
+                # save model if get higher accuracy
+
+
+    def eval(self, session):
+        # evaluate fcn
+        eval_x = tf.placeholder(tf.float32, [None, None, None, 3])
+        eval_y = tf.placeholder(tf.float32, [None, None])
+        eval_fcn = self.fcn_net(eval_x, train=False)
+
+        # load the model
+        saver = tf.train.Saver(max_to_keep=3)
+        session.run(tf.global_variables_initializer())
+
+        # restore the model
+        if not os.path.exist(self.model_dir):
+            print 'model dir not found'
+            return
+
+        ckpt = tf.train.get_checkpoint_state(self.model_dir)
+        if ckpt and ckpt.model_checkpoint_path:
+            saver.restore(session, self.model_dir)
+        else:
+            print 'restore model failure'
+            return
+
+    def iou_accuracy(self, eval_out, eval_y):
+        # remove the first dimension since the size is 1
+        eval_out = np.squeeze(eval_out, axis=0)
+
+        height, width = eval_y.shape
+        summary = np.zeros([height, width, 2])
+
+        # sum the patch results in eval_out
+        for i, a in enumerate(eval_out):
+            for j, b in enumerate(a):
+                # b is one patch of the fcn result
+                # convert logistic score to 0, 1 classification
+                b = np.round(b).astype(int)
+                for h, c in enumerate(b):
+                    for w, d in enumerate(c):
+                        # d is one pixel classification
+                        summary[i+h][j+w][d] += 1
+
+        # choice the max amount one
+        summary = np.argmax(summary, axis=2)
+
+        # calculate the iou accuracy
+        s = np.sum(summary)
+        e = np.sum(eval_y)
+        summary = summary.flatten()
+        eval_y = eval_y.flatten()
+        u = 0
+        for i, p in enumerate(summary):
+            if p == 1 and p == eval_y[i]:
+                u += 1
+
+        accuracy = 2.0 * u / (s + e)
+
+        return accuracy
+
+
+
+
+
+
+
+
+
+
+
 
 
 
