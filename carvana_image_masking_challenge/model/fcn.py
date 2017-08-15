@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import numpy as np
 import tensorflow as tf
 
@@ -9,6 +10,7 @@ class FCN():
         self.lr = lr
         self.dropout = dropout
         self.model_dir = model_dir
+        self.acc_file = os.path.join(self.model_dir, 'accuracy.json')
 
     def conv2d(self, x, filter, scope, activation='relu'):
         with tf.variable_scope(scope):
@@ -93,12 +95,17 @@ class FCN():
 
         # restore the model
         last_step = 0
+        last_acc = 0
         if not os.path.exist(self.model_dir):
             os.mkdir(self.model_dir)
         ckpt = tf.train.get_checkpoint_state(self.model_dir)
         if ckpt and ckpt.model_checkpoint_path:
             last_step = int(ckpt.model_checkpoint_path.split('-')[-1])
             saver.restore(session, self.model_dir)
+            if os.path.exist(self.acc_file):
+                acc_json = json.load(open(self.acc_file, 'r'))
+                last_acc = acc_json['accuracy']
+
 
         for step in xrange(last_step, 10000000):
             batch_x, batch_y = datagen.get_batch()
@@ -116,15 +123,21 @@ class FCN():
                     iou_acc = self.iou_accuracy(eval_out, eval_one_y)
 
                 avg_iou_acc = iou_acc/eval_sample_count
-                print "Validate IoU Accuracy: {}".format(avg_iou_acc)
+                print "Validate Set IoU Accuracy: {}".format(avg_iou_acc)
 
                 # save model if get higher accuracy
+                if avg_iou_acc > last_acc:
+                    last_acc = avg_iou_acc
+                    model_path = saver.save(session, self.model_dir)
+                    acc_json = {'accuracy': last_acc}
+                    json.dump(acc_json, open(self.acc_file, 'w'), indent=4)
+                    print 'Get higher accuracy, {}. Save model at {}, Save accuracy at {}'\
+                        .format(last_acc, model_path, self.acc_file)
 
 
     def eval(self, session):
         # evaluate fcn
         eval_x = tf.placeholder(tf.float32, [None, None, None, 3])
-        eval_y = tf.placeholder(tf.float32, [None, None])
         eval_fcn = self.fcn_net(eval_x, train=False)
 
         # load the model
@@ -142,6 +155,16 @@ class FCN():
         else:
             print 'restore model failure'
             return
+
+        iou_acc = 0
+        test_sample_count = datagen.get_test_sample_count()
+        for _ in xrange(test_sample_count):
+            sample_x, sample_y = datagen.get_one_test_sample()
+            sample_out = session.run(eval_fcn, feed_dict={eval_x: sample_x})
+            iou_acc = self.iou_accuracy(sample_out, sample_y)
+
+        avg_iou_acc = iou_acc/test_sample_count
+        print "Test Set IoU Accuracy: {}".format(avg_iou_acc)
 
     def iou_accuracy(self, eval_out, eval_y):
         # remove the first dimension since the size is 1
@@ -177,7 +200,6 @@ class FCN():
         accuracy = 2.0 * u / (s + e)
 
         return accuracy
-
 
 
 
