@@ -4,12 +4,16 @@ import json
 import numpy as np
 import tensorflow as tf
 
+import tools
+
 class FCN():
-    def __init__(self, batch_size=128, lr=0.0001, dropout=0.5, model_dir='checkpoints'):
+    def __init__(self, datagen, batch_size=128, lr=0.0001, dropout=0.5, model_dir='checkpoints', out_mask_dir= 'out_mask'):
+        self.datagen = datagen
         self.batch_size = batch_size
         self.lr = lr
         self.dropout = dropout
         self.model_dir = model_dir
+        self.out_mask_dir = out_mask_dir
         self.acc_file = os.path.join(self.model_dir, 'accuracy.json')
 
     def conv2d(self, x, filter, scope, activation='relu'):
@@ -79,7 +83,6 @@ class FCN():
         # evaluate fcn
         tf.get_variable_scope().reuse_variables()
         eval_x = tf.placeholder(tf.float32, [1, None, None, 3])
-        eval_y = tf.placeholder(tf.float32, [1, None, None])
         eval_fcn = self.fcn_net(eval_x, train=False)
 
         # L1 distance loss
@@ -107,8 +110,9 @@ class FCN():
                 last_acc = acc_json['accuracy']
 
 
+        generate_train_batch = self.datagen.generate_batch_train_samples(batch_size=self.batch_size)
         for step in xrange(last_step, 10000000):
-            batch_x, batch_y = datagen.get_batch()
+            batch_x, batch_y = generate_train_batch.next()
             _, loss_out = session.run([train_step, loss], feed_dict={x: batch_x, y: batch_y})
 
             if step % 10 == 0:
@@ -116,13 +120,15 @@ class FCN():
 
             if step != 0 and  step % 1000:
                 iou_acc = 0
-                eval_sample_count = datagen.get_eval_sample_count()
-                for _ in xrange(eval_sample_count):
-                    eval_one_x, eval_one_y = datagen.get_one_eval_sample()
-                    eval_out = session.run(eval_fcn, feed_dict={eval_x: eval_one_x})
-                    iou_acc = self.iou_accuracy(eval_out, eval_one_y)
+                val_sample_count = self.datagen.get_validate_sample_count()
+                validate_samples = self.datagen.generate_validate_samples()
+                for _ in xrange(val_sample_count):
+                    val_one_x, val_one_y, sample_name = validate_samples.next()
+                    val_out = session.run(eval_fcn, feed_dict={eval_x: val_one_x})
+                    iou_acc, mask = self.iou_accuracy(val_out, val_one_y)
+                    tools.mask_to_img(mask, self.out_mask_dir, sample_name)
 
-                avg_iou_acc = iou_acc/eval_sample_count
+                avg_iou_acc = iou_acc/val_sample_count
                 print "Validate Set IoU Accuracy: {}".format(avg_iou_acc)
 
                 # save model if get higher accuracy
@@ -157,11 +163,13 @@ class FCN():
             return
 
         iou_acc = 0
-        test_sample_count = datagen.get_test_sample_count()
+        test_sample_count = self.datagen.get_test_sample_count()
+        test_samples = self.datagen.generate_test_samples()
         for _ in xrange(test_sample_count):
-            sample_x, sample_y = datagen.get_one_test_sample()
+            sample_x, sample_y, sample_name = test_samples.next()
             sample_out = session.run(eval_fcn, feed_dict={eval_x: sample_x})
-            iou_acc = self.iou_accuracy(sample_out, sample_y)
+            iou_acc, mask = self.iou_accuracy(sample_out, sample_y)
+            tools.mask_to_img(mask, self.out_mask_dir, sample_name)
 
         avg_iou_acc = iou_acc/test_sample_count
         print "Test Set IoU Accuracy: {}".format(avg_iou_acc)
@@ -186,6 +194,7 @@ class FCN():
 
         # choice the max amount one
         summary = np.argmax(summary, axis=2)
+        mask = summary
 
         # calculate the iou accuracy
         s = np.sum(summary)
@@ -199,7 +208,7 @@ class FCN():
 
         accuracy = 2.0 * u / (s + e)
 
-        return accuracy
+        return accuracy, mask
 
 
 
