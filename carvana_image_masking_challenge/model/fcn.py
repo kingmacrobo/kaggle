@@ -133,12 +133,12 @@ class FCN():
                 print 'step {}, loss {}, generate data time: {:.2f} s, step train time: {:.2f} s'\
                     .format(step, loss_out, gd_b - gd_a, tr_b - tr_a)
 
-            if step % 10 == 0:
+            if step != 0 and step % 200 == 0:
                 print 'Evaluate validate set ... '
                 iou_acc = 0
                 val_sample_count = self.datagen.get_validate_sample_count()
                 validate_samples = self.datagen.generate_validate_samples()
-                for _ in xrange(val_sample_count):
+                for i in xrange(val_sample_count):
                     ed_a = time.time()
                     val_one_x, val_one_y, sample_name = validate_samples.next()
                     ed_b = time.time()
@@ -152,8 +152,8 @@ class FCN():
                     tools.mask_to_img(mask, self.out_mask_dir, sample_name)
                     ew_b = time.time()
 
-                    print 'evaluate {}, accuracy: {:.2f}, load: {:.2f} s, evaluate: {:.2f} s, write: {:.2f} s'\
-                        .format(sample_name, iou_acc, ed_b - ed_a, ee_b - ee_a, ew_b - ew_a)
+                    print '[{}] evaluate {}, accuracy: {:.2f}, load: {:.2f} s, evaluate: {:.2f} s, write: {:.2f} s'\
+                        .format(i, sample_name, iou_acc, ed_b - ed_a, ee_b - ee_a, ew_b - ew_a)
 
                 avg_iou_acc = iou_acc/val_sample_count
                 print "Validate Set IoU Accuracy: {}".format(avg_iou_acc)
@@ -206,7 +206,7 @@ class FCN():
         eval_out = np.squeeze(eval_out, axis=0)
 
         height, width = eval_y.shape
-        summary = np.zeros([height, width, 2])
+        summary = np.zeros([height, width])
 
         # sum the patch results in eval_out
         for i, a in enumerate(eval_out):
@@ -218,13 +218,9 @@ class FCN():
                 for h, c in enumerate(b):
                     for w, d in enumerate(c):
                         # d is one pixel classification
-                        summary[i+h][j+w][d] += 1
+                        if i*256+h < 1280 and j*256+w < 1918:
+                            summary[i*256+h][j*256+w] = d
 
-        print eval_out.shape
-        print summary
-
-        # choice the max amount one
-        summary = np.argmax(summary, axis=2)
         mask = summary
 
         # calculate the iou accuracy
@@ -240,17 +236,3 @@ class FCN():
         accuracy = 2.0 * u / (s + e)
 
         return accuracy, mask
-
-
-
-
-
-
-
-
-
-
-
-
-
-
