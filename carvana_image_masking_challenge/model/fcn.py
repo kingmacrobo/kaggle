@@ -7,7 +7,7 @@ import tensorflow as tf
 import tools
 
 class FCN():
-    def __init__(self, datagen, batch_size=128, lr=0.0001, dropout=0.5, model_dir='checkpoints', out_mask_dir= 'out_mask'):
+    def __init__(self, datagen, batch_size=64, lr=0.0001, dropout=0.5, model_dir='checkpoints', out_mask_dir= 'out_mask'):
         self.datagen = datagen
         self.batch_size = batch_size
         self.lr = lr
@@ -16,11 +16,13 @@ class FCN():
         self.out_mask_dir = out_mask_dir
         self.acc_file = os.path.join(self.model_dir, 'accuracy.json')
 
+        print 'batch size: {}, learning reate: {}, dropout: {}\n'.format(self.batch_size, self.lr, self.dropout)
+
     def conv2d(self, x, filter, scope, activation='relu'):
         with tf.variable_scope(scope):
             w = self.weight_variable(filter)
             b = self.bias_variable([filter[-1]])
-            x = tf.nn.conv2d(x, w, strides=[1, 1, 1, 1], padding='VALID')
+            x = tf.nn.conv2d(x, w, strides=[1, 1, 1, 1], padding='SAME')
             x = tf.nn.bias_add(x, b)
 
             if activation == 'sigmoid':
@@ -66,7 +68,7 @@ class FCN():
         drop = tf.nn.dropout(maxp8, self.dropout)
 
         # 1x1 convolution + sigmoid activation
-        net = self.conv2d(drop, [1, 1, 256, 128*128], 'conv9', activation='sigmoid')
+        net = self.conv2d(drop, [1, 1, 256, 256*256], 'conv9', activation='sigmoid')
 
         # squeeze the last two dimension in train
         if train:
@@ -76,14 +78,9 @@ class FCN():
 
     def train(self, session):
         # train fcn
-        x = tf.placeholder(tf.float32, [self.batch_size, 128, 128, 3])
-        y = tf.placeholder(tf.float32, [self.batch_size, 128*128])
+        x = tf.placeholder(tf.float32, [self.batch_size, 256, 256, 3])
+        y = tf.placeholder(tf.float32, [self.batch_size, 256*256])
         fcn = self.fcn_net(x)
-
-        # evaluate fcn
-        tf.get_variable_scope().reuse_variables()
-        eval_x = tf.placeholder(tf.float32, [1, None, None, 3])
-        eval_fcn = self.fcn_net(eval_x, train=False)
 
         # L1 distance loss
         loss = tf.reduce_mean(tf.abs(fcn-y))
@@ -94,18 +91,24 @@ class FCN():
 
 
         saver = tf.train.Saver(max_to_keep=3)
+
+        # evaluate fcn
+        tf.get_variable_scope().reuse_variables()
+        eval_x = tf.placeholder(tf.float32, [1, None, None, 3])
+        eval_fcn = self.fcn_net(eval_x, train=False)
+
         session.run(tf.global_variables_initializer())
 
         # restore the model
         last_step = 0
         last_acc = 0
-        if not os.path.exist(self.model_dir):
+        if not os.path.exists(self.model_dir):
             os.mkdir(self.model_dir)
         ckpt = tf.train.get_checkpoint_state(self.model_dir)
         if ckpt and ckpt.model_checkpoint_path:
             last_step = int(ckpt.model_checkpoint_path.split('-')[-1])
             saver.restore(session, self.model_dir)
-            if os.path.exist(self.acc_file):
+            if os.path.exists(self.acc_file):
                 acc_json = json.load(open(self.acc_file, 'r'))
                 last_acc = acc_json['accuracy']
 
@@ -118,7 +121,8 @@ class FCN():
             if step % 10 == 0:
                 print 'step {}, loss {}'.format(step, loss_out)
 
-            if step != 0 and  step % 1000:
+            if step != 0 and  step % 1000 == 0:
+                print 'Evaluate one validate set ... '
                 iou_acc = 0
                 val_sample_count = self.datagen.get_validate_sample_count()
                 validate_samples = self.datagen.generate_validate_samples()
@@ -186,6 +190,7 @@ class FCN():
             for j, b in enumerate(a):
                 # b is one patch of the fcn result
                 # convert logistic score to 0, 1 classification
+                b = np.reshape(b, [256, 256])
                 b = np.round(b).astype(int)
                 for h, c in enumerate(b):
                     for w, d in enumerate(c):
