@@ -84,9 +84,11 @@ class DataGenerator():
         height, width = image.shape[:-1]
 
         top = random.randint(0, height - h)
+        #top = 0
         bot = top + h
 
         left = random.randint(0, width - w)
+        #left = 0
         right = left + w
 
         croped_image = image[top: bot, left: right, : ].copy()
@@ -100,8 +102,10 @@ class DataGenerator():
             batch_gt_masks = []
             for _ in xrange(batch_size):
                 img_path = random.choice(self.train_list)
+                #img_path = self.train_list[0]
                 image = self.load_image_from_file(img_path)
                 gt_mask = self.load_gt_mask_from_file(img_path)
+
 
                 '''
                 # load images from memory (memory cost a lot)

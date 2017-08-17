@@ -1,5 +1,5 @@
 import os
-import sys
+import time
 import json
 import numpy as np
 import tensorflow as tf
@@ -7,7 +7,7 @@ import tensorflow as tf
 import tools
 
 class FCN():
-    def __init__(self, datagen, batch_size=64, lr=0.0001, dropout=0.5, model_dir='checkpoints', out_mask_dir= 'out_mask'):
+    def __init__(self, datagen, batch_size=64, lr=0.001, dropout=0.5, model_dir='checkpoints', out_mask_dir= 'out_mask'):
         self.datagen = datagen
         self.batch_size = batch_size
         self.lr = lr
@@ -27,13 +27,16 @@ class FCN():
 
             if activation == 'sigmoid':
                 return tf.nn.sigmoid(x)
+            elif activation == 'no':
+                return x
+
             return tf.nn.relu(x)
 
     def maxpooling(self, x, k=2):
-        return tf.nn.max_pool(x, ksize=[1, k, k, 1], strides=[1, k, k, 1], padding='VALID')
+        return tf.nn.max_pool(x, ksize=[1, k, k, 1], strides=[1, k, k, 1], padding='SAME')
 
     def weight_variable(self, shape):
-        init = tf.truncated_normal(shape, stddev=1)
+        init = tf.truncated_normal(shape, stddev=0.1)
         return tf.Variable(init)
 
     def bias_variable(self, shape):
@@ -68,7 +71,7 @@ class FCN():
         drop = tf.nn.dropout(maxp8, self.dropout)
 
         # 1x1 convolution + sigmoid activation
-        net = self.conv2d(drop, [1, 1, 256, 256*256], 'conv9', activation='sigmoid')
+        net = self.conv2d(drop, [1, 1, 256, 256*256], 'conv9', activation='no')
 
         # squeeze the last two dimension in train
         if train:
@@ -83,7 +86,10 @@ class FCN():
         fcn = self.fcn_net(x)
 
         # L1 distance loss
-        loss = tf.reduce_mean(tf.abs(fcn-y))
+        #loss = tf.reduce_mean(tf.abs(tf.sigmoid(fcn)-y))
+
+        # sigmoid cross entropy loss
+        loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=fcn))
 
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
@@ -95,7 +101,7 @@ class FCN():
         # evaluate fcn
         tf.get_variable_scope().reuse_variables()
         eval_x = tf.placeholder(tf.float32, [1, None, None, 3])
-        eval_fcn = self.fcn_net(eval_x, train=False)
+        eval_fcn = tf.nn.sigmoid(self.fcn_net(eval_x, train=False))
 
         session.run(tf.global_variables_initializer())
 
@@ -115,22 +121,39 @@ class FCN():
 
         generate_train_batch = self.datagen.generate_batch_train_samples(batch_size=self.batch_size)
         for step in xrange(last_step, 10000000):
+            gd_a = time.time()
             batch_x, batch_y = generate_train_batch.next()
+            gd_b = time.time()
+
+            tr_a = time.time()
             _, loss_out = session.run([train_step, loss], feed_dict={x: batch_x, y: batch_y})
+            tr_b = time.time()
 
             if step % 10 == 0:
-                print 'step {}, loss {}'.format(step, loss_out)
+                print 'step {}, loss {}, generate data time: {:.2f} s, step train time: {:.2f} s'\
+                    .format(step, loss_out, gd_b - gd_a, tr_b - tr_a)
 
-            if step != 0 and  step % 1000 == 0:
-                print 'Evaluate one validate set ... '
+            if step % 10 == 0:
+                print 'Evaluate validate set ... '
                 iou_acc = 0
                 val_sample_count = self.datagen.get_validate_sample_count()
                 validate_samples = self.datagen.generate_validate_samples()
                 for _ in xrange(val_sample_count):
+                    ed_a = time.time()
                     val_one_x, val_one_y, sample_name = validate_samples.next()
+                    ed_b = time.time()
+
+                    ee_a = time.time()
                     val_out = session.run(eval_fcn, feed_dict={eval_x: val_one_x})
                     iou_acc, mask = self.iou_accuracy(val_out, val_one_y)
+                    ee_b = time.time()
+
+                    ew_a = time.time()
                     tools.mask_to_img(mask, self.out_mask_dir, sample_name)
+                    ew_b = time.time()
+
+                    print 'evaluate {}, accuracy: {:.2f}, load: {:.2f} s, evaluate: {:.2f} s, write: {:.2f} s'\
+                        .format(sample_name, iou_acc, ed_b - ed_a, ee_b - ee_a, ew_b - ew_a)
 
                 avg_iou_acc = iou_acc/val_sample_count
                 print "Validate Set IoU Accuracy: {}".format(avg_iou_acc)
@@ -148,7 +171,7 @@ class FCN():
     def eval(self, session):
         # evaluate fcn
         eval_x = tf.placeholder(tf.float32, [None, None, None, 3])
-        eval_fcn = self.fcn_net(eval_x, train=False)
+        eval_fcn = tf.nn.sigmoid(self.fcn_net(eval_x, train=False))
 
         # load the model
         saver = tf.train.Saver(max_to_keep=3)
@@ -196,6 +219,9 @@ class FCN():
                     for w, d in enumerate(c):
                         # d is one pixel classification
                         summary[i+h][j+w][d] += 1
+
+        print eval_out.shape
+        print summary
 
         # choice the max amount one
         summary = np.argmax(summary, axis=2)
