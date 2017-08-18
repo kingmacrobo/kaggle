@@ -112,15 +112,17 @@ class FCN():
             os.mkdir(self.model_dir)
         ckpt = tf.train.get_checkpoint_state(self.model_dir)
         if ckpt and ckpt.model_checkpoint_path:
-            last_step = int(ckpt.model_checkpoint_path.split('-')[-1])
-            saver.restore(session, self.model_dir)
+            saver.restore(session, ckpt.model_checkpoint_path)
             if os.path.exists(self.acc_file):
                 acc_json = json.load(open(self.acc_file, 'r'))
                 last_acc = acc_json['accuracy']
+                last_step = acc_json['step']
+            print 'Model restored from {}, last accuracy: {}, last step: {}'\
+                .format(ckpt.model_checkpoint_path, last_acc, last_step)
 
 
         generate_train_batch = self.datagen.generate_batch_train_samples(batch_size=self.batch_size)
-        for step in xrange(last_step, 10000000):
+        for step in xrange(last_step + 1, 10000000):
             gd_a = time.time()
             batch_x, batch_y = generate_train_batch.next()
             gd_b = time.time()
@@ -129,13 +131,13 @@ class FCN():
             _, loss_out = session.run([train_step, loss], feed_dict={x: batch_x, y: batch_y})
             tr_b = time.time()
 
-            if step % 10 == 0:
-                print 'step {}, loss {}, generate data time: {:.2f} s, step train time: {:.2f} s'\
-                    .format(step, loss_out, gd_b - gd_a, tr_b - tr_a)
+            #if step % 10 == 0:
+            print 'step {}, loss {}, generate data time: {:.2f} s, step train time: {:.2f} s'\
+                .format(step, loss_out, gd_b - gd_a, tr_b - tr_a)
 
-            if step != 0 and step % 200 == 0:
+            if step % 200 == 0:
                 print 'Evaluate validate set ... '
-                iou_acc = 0
+                iou_acc_total = 0
                 val_sample_count = self.datagen.get_validate_sample_count()
                 validate_samples = self.datagen.generate_validate_samples()
                 for i in xrange(val_sample_count):
@@ -148,6 +150,8 @@ class FCN():
                     iou_acc, mask = self.iou_accuracy(val_out, val_one_y)
                     ee_b = time.time()
 
+                    iou_acc_total += iou_acc
+
                     ew_a = time.time()
                     tools.mask_to_img(mask, self.out_mask_dir, sample_name)
                     ew_b = time.time()
@@ -155,14 +159,14 @@ class FCN():
                     print '[{}] evaluate {}, accuracy: {:.2f}, load: {:.2f} s, evaluate: {:.2f} s, write: {:.2f} s'\
                         .format(i, sample_name, iou_acc, ed_b - ed_a, ee_b - ee_a, ew_b - ew_a)
 
-                avg_iou_acc = iou_acc/val_sample_count
+                avg_iou_acc = iou_acc_total/val_sample_count
                 print "Validate Set IoU Accuracy: {}".format(avg_iou_acc)
 
                 # save model if get higher accuracy
                 if avg_iou_acc > last_acc:
                     last_acc = avg_iou_acc
-                    model_path = saver.save(session, self.model_dir)
-                    acc_json = {'accuracy': last_acc}
+                    model_path = saver.save(session, os.path.join(self.model_dir, 'fcn'))
+                    acc_json = {'accuracy': last_acc, 'step': step}
                     json.dump(acc_json, open(self.acc_file, 'w'), indent=4)
                     print 'Get higher accuracy, {}. Save model at {}, Save accuracy at {}'\
                         .format(last_acc, model_path, self.acc_file)
