@@ -7,7 +7,7 @@ from PIL import Image
 
 class DataGenerator():
 
-    def __init__(self, train_list_file, test_list_file, train_mask_dir, train_height=256, train_width=256):
+    def __init__(self, train_list_file, test_list_file, train_mask_dir, debug_dir=None, train_height=256, train_width=256):
 
         self.train_heigth = train_height
         self.train_width = train_width
@@ -21,6 +21,21 @@ class DataGenerator():
         self.train_mask_dir = train_mask_dir
 
         self.split_train_data(train_list_file)
+
+        self.debug = False
+
+        if debug_dir:
+            self.debug = True
+            self.debug_dir = debug_dir
+            self.debug_train = os.path.join(self.debug_dir, 'train')
+            self.debug_mask = os.path.join(self.debug_dir, 'mask')
+
+            if not os.path.exists(self.debug_dir):
+                os.mkdir(self.debug_dir)
+            if not os.path.exists(self.debug_train):
+                os.mkdir(self.debug_train)
+            if not os.path.exists(self.debug_mask):
+                os.mkdir(self.debug_mask)
 
         #self.load_images()
 
@@ -78,6 +93,7 @@ class DataGenerator():
         mask_path = os.path.join(self.train_mask_dir, name + '_mask.gif')
         im = Image.open(mask_path)
         mask = np.array(im)
+        mask = mask/255
         return mask
 
     def random_crop(self, image, gt_mask, h, w):
@@ -100,7 +116,7 @@ class DataGenerator():
         while True:
             batch_images = []
             batch_gt_masks = []
-            for _ in xrange(batch_size):
+            for i in xrange(batch_size):
                 img_path = random.choice(self.train_list)
                 #img_path = self.train_list[0]
                 image = self.load_image_from_file(img_path)
@@ -115,6 +131,10 @@ class DataGenerator():
                 '''
 
                 c_img, c_gt_mask = self.random_crop(image, gt_mask, self.train_heigth, self.train_width)
+
+                if self.debug:
+                    self.save_debug_image(str(i), c_img, c_gt_mask)
+
                 batch_images.append(c_img)
                 batch_gt_masks.append(c_gt_mask.flatten())
 
@@ -143,4 +163,11 @@ class DataGenerator():
             img = cv2.imread(img_path)
             yield img, name
 
+    def save_debug_image(self, name, image, mask):
+        img_path = os.path.join(self.debug_train, name + '.jpg')
+        mask_path = os.path.join(self.debug_mask, name + '.gif')
+
+        mask = mask*255
+        cv2.imwrite(img_path, image)
+        Image.fromarray(mask).save(mask_path)
 

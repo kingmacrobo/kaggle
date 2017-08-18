@@ -2,6 +2,7 @@ import numpy as np
 import cv2
 import os
 
+
 def length_encoder(mask):
     mask = mask.flatten()
 
@@ -25,12 +26,45 @@ def mask_to_img(mask, out_dir, sample_name):
         os.mkdir(out_dir)
 
     dst = os.path.join(out_dir, sample_name + '_mask.jpg')
+    mask = mask*255
     cv2.imwrite(dst, mask)
+
 
 def load_mask(img_path):
     mask = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
     return mask
 
+def iou_check(mask_a, mask_b):
+    # calculate the iou accuracy
+    a = mask_a.flatten()
+    b = mask_b.flatten()
+
+    print a.shape, b.shape
+
+    s = np.sum(mask_a)
+    e = np.sum(mask_b)
+
+    print np.where(a)
+    print np.where(b)
+
+    u = np.sum(a & b)
+
+    accuracy = 2.0 * u / (s + e)
+
+    return accuracy
+
+def main():
+    import sys
+    from PIL import Image
+
+    a = sys.argv[1]
+    b = sys.argv[2]
+
+    img_a = cv2.imread(a, cv2.IMREAD_GRAYSCALE)
+    img_b = np.array(Image.open(b))
+
+    print iou_check(img_a, img_b)
 
 
-
+if __name__ == '__main__':
+    main()

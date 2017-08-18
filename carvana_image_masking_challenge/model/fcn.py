@@ -38,12 +38,12 @@ class FCN():
         return tf.nn.max_pool(x, ksize=[1, k, k, 1], strides=[1, k, k, 1], padding='SAME')
 
     def weight_variable(self, shape):
-        init = tf.truncated_normal(shape, stddev=0.1)
-        return tf.Variable(init)
+        return tf.get_variable("weights",
+                               shape,
+                               initializer=tf.truncated_normal_initializer(stddev=0.1))
 
     def bias_variable(self, shape):
-        init = tf.constant(0.1, shape=shape)
-        return tf.Variable(init)
+        return tf.get_variable("biases", shape, initializer=tf.constant_initializer(0.1))
 
     def fcn_net(self, x, train=True):
         conv1 = self.conv2d(x, [3, 3, 3, 32], 'conv1')
@@ -108,7 +108,7 @@ class FCN():
         session.run(tf.global_variables_initializer())
 
         # restore the model
-        last_step = 0
+        last_step = -1
         last_acc = 0
         if not os.path.exists(self.model_dir):
             os.mkdir(self.model_dir)
@@ -138,11 +138,12 @@ class FCN():
                     .format(step, loss_out, gd_b - gd_a, tr_b - tr_a)
                 self.loss_log.write('{} {}\n'.format(step, loss_out))
 
-            if step % 200 == 0:
+            if step % 100 == 0:
                 print 'Evaluate validate set ... '
                 iou_acc_total = 0
                 val_sample_count = self.datagen.get_validate_sample_count()
                 validate_samples = self.datagen.generate_validate_samples()
+                val_sample_count = 10
                 for i in xrange(val_sample_count):
                     ed_a = time.time()
                     val_one_x, val_one_y, sample_name = validate_samples.next()
@@ -164,7 +165,7 @@ class FCN():
 
                 avg_iou_acc = iou_acc_total/val_sample_count
 
-                self.acc_log.write('{} {}'.format(step, avg_iou_acc))
+                self.acc_log.write('{} {}\n'.format(step, avg_iou_acc))
                 print "Validate Set IoU Accuracy: {}".format(avg_iou_acc)
 
                 # save model if get higher accuracy
@@ -172,7 +173,9 @@ class FCN():
                     last_acc = avg_iou_acc
                     model_path = saver.save(session, os.path.join(self.model_dir, 'fcn'))
                     acc_json = {'accuracy': last_acc, 'step': step}
-                    json.dump(acc_json, open(self.acc_file, 'w'), indent=4)
+                    with open(self.acc_file, 'w') as f:
+                        json.dump(acc_json, f, indent=4)
+
                     print 'Get higher accuracy, {}. Save model at {}, Save accuracy at {}'\
                         .format(last_acc, model_path, self.acc_file)
 
@@ -233,14 +236,14 @@ class FCN():
         mask = summary
 
         # calculate the iou accuracy
-        s = np.sum(summary)
-        e = np.sum(eval_y)
         summary = summary.flatten()
         eval_y = eval_y.flatten()
-        u = 0
-        for i, p in enumerate(summary):
-            if p == 1 and p == eval_y[i]:
-                u += 1
+
+        s = np.sum(summary)
+        e = np.sum(eval_y)
+
+        print summary.shape, eval_y.shape
+        u = np.sum(summary & eval_y)
 
         accuracy = 2.0 * u / (s + e)
 
