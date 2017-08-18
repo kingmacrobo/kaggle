@@ -15,6 +15,8 @@ class FCN():
         self.model_dir = model_dir
         self.out_mask_dir = out_mask_dir
         self.acc_file = os.path.join(self.model_dir, 'accuracy.json')
+        self.loss_log = open('loss_log', 'w')
+        self.acc_log = open('acc_log', 'w')
 
         print 'batch size: {}, learning reate: {}, dropout: {}\n'.format(self.batch_size, self.lr, self.dropout)
 
@@ -131,9 +133,10 @@ class FCN():
             _, loss_out = session.run([train_step, loss], feed_dict={x: batch_x, y: batch_y})
             tr_b = time.time()
 
-            #if step % 10 == 0:
-            print 'step {}, loss {}, generate data time: {:.2f} s, step train time: {:.2f} s'\
-                .format(step, loss_out, gd_b - gd_a, tr_b - tr_a)
+            if step % 10 == 0:
+                print 'step {}, loss {}, generate data time: {:.2f} s, step train time: {:.2f} s'\
+                    .format(step, loss_out, gd_b - gd_a, tr_b - tr_a)
+                self.loss_log.write('{} {}\n'.format(step, loss_out))
 
             if step % 200 == 0:
                 print 'Evaluate validate set ... '
@@ -160,6 +163,8 @@ class FCN():
                         .format(i, sample_name, iou_acc, ed_b - ed_a, ee_b - ee_a, ew_b - ew_a)
 
                 avg_iou_acc = iou_acc_total/val_sample_count
+
+                self.acc_log.write('{} {}'.format(step, avg_iou_acc))
                 print "Validate Set IoU Accuracy: {}".format(avg_iou_acc)
 
                 # save model if get higher accuracy

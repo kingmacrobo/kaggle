@@ -3,3 +3,4 @@ checkpoints/
 validate_out_mask/
 test_out_mask/
 model/*.pyc
+model/*log
