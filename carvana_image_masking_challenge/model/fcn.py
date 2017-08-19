@@ -7,7 +7,7 @@ import tensorflow as tf
 import tools
 
 class FCN():
-    def __init__(self, datagen, batch_size=64, lr=0.001, dropout=0.5, model_dir='checkpoints', out_mask_dir= 'out_mask'):
+    def __init__(self, datagen, batch_size=64, lr=0.0001, dropout=0.5, model_dir='checkpoints', out_mask_dir= 'out_mask'):
         self.datagen = datagen
         self.batch_size = batch_size
         self.lr = lr
@@ -88,15 +88,14 @@ class FCN():
         fcn = self.fcn_net(x)
 
         # L1 distance loss
-        #loss = tf.reduce_mean(tf.abs(tf.sigmoid(fcn)-y))
+        loss = tf.reduce_mean(tf.abs(tf.sigmoid(fcn)-y))
 
         # sigmoid cross entropy loss
-        loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=fcn))
+        #loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=fcn))
 
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
         train_step = tf.train.AdamOptimizer(learning_rate=self.lr).minimize(loss, global_step=global_step)
-
 
         saver = tf.train.Saver(max_to_keep=3)
 
@@ -143,7 +142,6 @@ class FCN():
                 iou_acc_total = 0
                 val_sample_count = self.datagen.get_validate_sample_count()
                 validate_samples = self.datagen.generate_validate_samples()
-                val_sample_count = 10
                 for i in xrange(val_sample_count):
                     ed_a = time.time()
                     val_one_x, val_one_y, sample_name = validate_samples.next()

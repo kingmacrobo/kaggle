@@ -122,7 +122,7 @@ class DataGenerator():
         step = 0
         while True:
             # load 1000 train images to memory
-            if step % 100000 == 0:
+            if step % 50000 == 0:
                 self.load_train_images()
 
             batch_images = []
@@ -131,13 +131,6 @@ class DataGenerator():
                 index = random.randint(0, len(self.selected_train)-1)
                 image = self.train_images[index]
                 gt_mask = self.train_gt_masks[index]
-
-                '''
-                # load images from memory (memory cost a lot)
-                name = img_path.split('/')[-1]
-                image = self.train_images[name]
-                gt_mask = self.train_gt_masks[name]
-                '''
 
                 c_img, c_gt_mask = self.random_crop(image, gt_mask, self.train_heigth, self.train_width)
 
