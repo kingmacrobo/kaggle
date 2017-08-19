@@ -2,6 +2,8 @@ import numpy as np
 import cv2
 import os
 
+from PIL import Image
+
 
 def length_encoder(mask):
     mask = mask.flatten()
@@ -25,9 +27,9 @@ def mask_to_img(mask, out_dir, sample_name):
     if not os.path.exists(out_dir):
         os.mkdir(out_dir)
 
-    dst = os.path.join(out_dir, sample_name + '_mask.jpg')
+    dst = os.path.join(out_dir, sample_name + '_mask.gif')
     mask = mask*255
-    cv2.imwrite(dst, mask)
+    Image.fromarray(mask).save(dst)
 
 
 def load_mask(img_path):

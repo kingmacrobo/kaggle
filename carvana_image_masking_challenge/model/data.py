@@ -37,7 +37,7 @@ class DataGenerator():
             if not os.path.exists(self.debug_mask):
                 os.mkdir(self.debug_mask)
 
-        #self.load_images()
+        self.load_validate_images()
 
     def split_train_data(self, train_list_file, validate_fx=0.1):
         with open(train_list_file, 'r') as f:
@@ -56,33 +56,42 @@ class DataGenerator():
 
             print 'Train samples {}, Validate Samples {}'.format(len(self.train_list), len(self.validate_list))
 
-    def load_images(self):
-        self.train_images = {}
-        self.train_gt_masks = {}
-        self.validate_images = {}
-        self.validate_gt_masks = {}
+    def load_validate_images(self):
+        self.validate_images = []
+        self.validate_gt_masks = []
 
-        for i, img_path in enumerate(self.train_list):
-            print i, img_path
-            name = img_path.split('/')[-1]
-            img = cv2.imread(img_path)
-            self.train_images[name] = img
-
-            mask_path = os.path.join(self.train_mask_dir, name.split('.')[0] + '_mask.gif')
-            mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-            self.train_gt_masks[name] = mask
-
+        print 'Loading validate images to memory ...'
         for i, img_path in enumerate(self.validate_list):
             print i, img_path
             name = img_path.split('/')[-1]
             img = cv2.imread(img_path)
-            self.validate_images[name] = img
+            self.validate_images.append(img)
 
             mask_path = os.path.join(self.train_mask_dir, name.split('.')[0] + '_mask.gif')
-            mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
-            self.validate_gt_masks[name] = mask
+            im = Image.open(mask_path)
+            mask = np.array(im)
+            self.validate_gt_masks.append(mask)
+        print 'Load validate images done! ^_^ \n'
 
-        print 'Load train images done! ^_^ \n'
+    def load_train_images(self):
+
+        self.train_images = []
+        self.train_gt_masks = []
+
+        print 'Loading 1000 train images to memory ...'
+        self.selected_train = random.sample(self.train_list, 1000)
+        for i, img_path in enumerate(self.selected_train):
+            print i, img_path
+            name = img_path.split('/')[-1]
+            img = cv2.imread(img_path)
+            self.train_images.append(img)
+
+            mask_path = os.path.join(self.train_mask_dir, name.split('.')[0] + '_mask.gif')
+            im = Image.open(mask_path)
+            mask = np.array(im)
+            self.train_gt_masks.append(mask)
+
+        print 'Random load 1000 train images done! ^_^ \n'
 
     def load_image_from_file(self, img_path):
         img = cv2.imread(img_path)
@@ -93,18 +102,15 @@ class DataGenerator():
         mask_path = os.path.join(self.train_mask_dir, name + '_mask.gif')
         im = Image.open(mask_path)
         mask = np.array(im)
-        mask = mask/255
         return mask
 
     def random_crop(self, image, gt_mask, h, w):
         height, width = image.shape[:-1]
 
         top = random.randint(0, height - h)
-        #top = 0
         bot = top + h
 
         left = random.randint(0, width - w)
-        #left = 0
         right = left + w
 
         croped_image = image[top: bot, left: right, : ].copy()
@@ -113,15 +119,18 @@ class DataGenerator():
         return croped_image, croped_gt_mask
 
     def generate_batch_train_samples(self, batch_size=64):
+        step = 0
         while True:
+            # load 1000 train images to memory
+            if step % 100000 == 0:
+                self.load_train_images()
+
             batch_images = []
             batch_gt_masks = []
             for i in xrange(batch_size):
-                img_path = random.choice(self.train_list)
-                #img_path = self.train_list[0]
-                image = self.load_image_from_file(img_path)
-                gt_mask = self.load_gt_mask_from_file(img_path)
-
+                index = random.randint(0, len(self.selected_train)-1)
+                image = self.train_images[index]
+                gt_mask = self.train_gt_masks[index]
 
                 '''
                 # load images from memory (memory cost a lot)
@@ -141,16 +150,18 @@ class DataGenerator():
             batch_images = np.asarray(batch_images)
             batch_gt_masks = np.asarray(batch_gt_masks)
 
+            step += 1
+
             yield batch_images, batch_gt_masks
 
     def get_validate_sample_count(self):
         return len(self.validate_list)
 
     def generate_validate_samples(self):
-        for img_path in self.validate_list:
+        for index, img_path in enumerate(self.validate_list):
             name = img_path.split('/')[-1]
-            image = self.load_image_from_file(img_path)
-            gt_mask = self.load_gt_mask_from_file(img_path)
+            image = self.validate_images[index]
+            gt_mask = self.validate_gt_masks[index]
 
             yield np.array([image]), gt_mask, name
 

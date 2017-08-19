@@ -124,7 +124,7 @@ class FCN():
 
 
         generate_train_batch = self.datagen.generate_batch_train_samples(batch_size=self.batch_size)
-        for step in xrange(last_step + 1, 10000000):
+        for step in xrange(last_step + 1, 100000000):
             gd_a = time.time()
             batch_x, batch_y = generate_train_batch.next()
             gd_b = time.time()
@@ -138,7 +138,7 @@ class FCN():
                     .format(step, loss_out, gd_b - gd_a, tr_b - tr_a)
                 self.loss_log.write('{} {}\n'.format(step, loss_out))
 
-            if step % 100 == 0:
+            if step % 1000 == 0:
                 print 'Evaluate validate set ... '
                 iou_acc_total = 0
                 val_sample_count = self.datagen.get_validate_sample_count()
@@ -218,7 +218,7 @@ class FCN():
         eval_out = np.squeeze(eval_out, axis=0)
 
         height, width = eval_y.shape
-        summary = np.zeros([height, width])
+        mask = np.zeros([height, width])
 
         # sum the patch results in eval_out
         for i, a in enumerate(eval_out):
@@ -226,24 +226,18 @@ class FCN():
                 # b is one patch of the fcn result
                 # convert logistic score to 0, 1 classification
                 b = np.reshape(b, [256, 256])
-                b = np.round(b).astype(int)
+                b = np.round(b).astype(np.int8)
                 for h, c in enumerate(b):
                     for w, d in enumerate(c):
                         # d is one pixel classification
                         if i*256+h < 1280 and j*256+w < 1918:
-                            summary[i*256+h][j*256+w] = d
-
-        mask = summary
+                            mask[i*256+h][j*256+w] = d
 
         # calculate the iou accuracy
-        summary = summary.flatten()
-        eval_y = eval_y.flatten()
-
-        s = np.sum(summary)
+        mask = mask.astype(np.int8)
+        s = np.sum(mask)
         e = np.sum(eval_y)
-
-        print summary.shape, eval_y.shape
-        u = np.sum(summary & eval_y)
+        u = np.sum(mask.flatten() & eval_y.flatten())
 
         accuracy = 2.0 * u / (s + e)
 
