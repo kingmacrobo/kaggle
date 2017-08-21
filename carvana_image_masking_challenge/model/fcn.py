@@ -8,6 +8,7 @@ import tools
 
 class FCN():
     def __init__(self, datagen, batch_size=64, lr=0.0001, dropout=0.5, model_dir='checkpoints', out_mask_dir= 'out_mask'):
+
         self.datagen = datagen
         self.batch_size = batch_size
         self.lr = lr
@@ -88,14 +89,18 @@ class FCN():
         fcn = self.fcn_net(x)
 
         # L1 distance loss
-        loss = tf.reduce_mean(tf.abs(tf.sigmoid(fcn)-y))
+        #loss = tf.reduce_mean(tf.abs(tf.sigmoid(fcn)-y))
 
         # sigmoid cross entropy loss
-        #loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=fcn))
+        loss_sum = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=fcn), axis=1)
+        loss = tf.reduce_mean(loss_sum)
 
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
-        train_step = tf.train.AdamOptimizer(learning_rate=self.lr).minimize(loss, global_step=global_step)
+        learning_rate = tf.train.exponential_decay(self.lr, global_step,
+                                                   5000, 0.95, staircase=True)
+
+        train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss, global_step=global_step)
 
         saver = tf.train.Saver(max_to_keep=3)
 
@@ -137,7 +142,7 @@ class FCN():
                     .format(step, loss_out, gd_b - gd_a, tr_b - tr_a)
                 self.loss_log.write('{} {}\n'.format(step, loss_out))
 
-            if step % 1000 == 0:
+            if step != 0 and step % 10000 == 0:
                 print 'Evaluate validate set ... '
                 iou_acc_total = 0
                 val_sample_count = self.datagen.get_validate_sample_count()

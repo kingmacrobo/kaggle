@@ -113,7 +113,7 @@ class DataGenerator():
         left = random.randint(0, width - w)
         right = left + w
 
-        croped_image = image[top: bot, left: right, : ].copy()
+        croped_image = image[top: bot, left: right, : ].copy()/255.0
         croped_gt_mask = gt_mask[top: bot, left: right].copy()
 
         return croped_image, croped_gt_mask
@@ -153,7 +153,7 @@ class DataGenerator():
     def generate_validate_samples(self):
         for index, img_path in enumerate(self.validate_list):
             name = img_path.split('/')[-1]
-            image = self.validate_images[index]
+            image = self.validate_images[index]/255.0
             gt_mask = self.validate_gt_masks[index]
 
             yield np.array([image]), gt_mask, name
