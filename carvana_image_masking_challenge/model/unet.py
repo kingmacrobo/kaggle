@@ -68,8 +68,6 @@ class UNET():
 
         return logits
 
-
-
     def train(self, session):
         # train fcn
         x = tf.placeholder(tf.float32, [self.batch_size, self.input_size, self.input_size, 3])
@@ -135,7 +133,7 @@ class UNET():
                 total_loss = 0
                 count = 0
 
-            if step != 0 and step % 3000 == 0:
+            if step != 0 and step % 100 == 0:
                 model_path = saver.save(session, os.path.join(self.model_dir, 'unet'))
                 if os.path.exists(self.acc_file):
                     j_dict = json.load(open(self.acc_file))
@@ -146,7 +144,7 @@ class UNET():
                 json.dump(j_dict, open(self.acc_file, 'w'), indent=4)
                 print 'Save model at {}'.format(model_path)
 
-            if step % 1000 == 0:
+            if step != 0 and step % 1000 == 0:
                 print 'Evaluate validate set ... '
                 iou_acc_total = 0
                 #val_sample_count = self.datagen.get_validate_sample_count()
