@@ -7,7 +7,7 @@ from PIL import Image
 
 class DataGenerator():
 
-    def __init__(self, train_list_file, test_list_file, train_mask_dir, debug_dir=None, train_height=256, train_width=256):
+    def __init__(self, train_list_file, test_list_file, train_mask_dir, debug_dir=None, train_height=512, train_width=512):
 
         self.train_heigth = train_height
         self.train_width = train_width

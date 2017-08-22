@@ -7,7 +7,7 @@ import tensorflow as tf
 import tools
 
 class FCN():
-    def __init__(self, datagen, batch_size=64, lr=0.0001, dropout=0.5, model_dir='checkpoints', out_mask_dir= 'out_mask'):
+    def __init__(self, datagen, batch_size=8, lr=0.001, dropout=0.5, model_dir='checkpoints', out_mask_dir= 'out_mask'):
 
         self.datagen = datagen
         self.batch_size = batch_size
@@ -18,6 +18,8 @@ class FCN():
         self.acc_file = os.path.join(self.model_dir, 'accuracy.json')
         self.loss_log = open('loss_log', 'w')
         self.acc_log = open('acc_log', 'w')
+
+        self.input_size = 512
 
         print 'batch size: {}, learning reate: {}, dropout: {}\n'.format(self.batch_size, self.lr, self.dropout)
 
@@ -71,10 +73,13 @@ class FCN():
         conv8 = self.conv2d(maxp7, [3, 3, 256, 256], 'conv8')
         maxp8 = self.maxpooling(conv8)
 
-        drop = tf.nn.dropout(maxp8, self.dropout)
+        conv9 = self.conv2d(maxp8, [3, 3, 256, 512], 'conv9')
+        maxp9 = self.maxpooling(conv9)
+
+        drop = tf.nn.dropout(maxp9, self.dropout)
 
         # 1x1 convolution + sigmoid activation
-        net = self.conv2d(drop, [1, 1, 256, 256*256], 'conv9', activation='no')
+        net = self.conv2d(drop, [1, 1, 512, self.input_size*self.input_size], 'conv10', activation='no')
 
         # squeeze the last two dimension in train
         if train:
@@ -84,8 +89,8 @@ class FCN():
 
     def train(self, session):
         # train fcn
-        x = tf.placeholder(tf.float32, [self.batch_size, 256, 256, 3])
-        y = tf.placeholder(tf.float32, [self.batch_size, 256*256])
+        x = tf.placeholder(tf.float32, [self.batch_size, self.input_size, self.input_size, 3])
+        y = tf.placeholder(tf.float32, [self.batch_size, self.input_size*self.input_size])
         fcn = self.fcn_net(x)
 
         # L1 distance loss
@@ -98,7 +103,7 @@ class FCN():
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
         learning_rate = tf.train.exponential_decay(self.lr, global_step,
-                                                   5000, 0.95, staircase=True)
+                                                   10000, 0.95, staircase=True)
 
         train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss, global_step=global_step)
 
@@ -128,6 +133,8 @@ class FCN():
 
 
         generate_train_batch = self.datagen.generate_batch_train_samples(batch_size=self.batch_size)
+        total_loss = 0
+        count = 0
         for step in xrange(last_step + 1, 100000000):
             gd_a = time.time()
             batch_x, batch_y = generate_train_batch.next()
@@ -137,12 +144,25 @@ class FCN():
             _, loss_out = session.run([train_step, loss], feed_dict={x: batch_x, y: batch_y})
             tr_b = time.time()
 
-            if step % 10 == 0:
-                print 'step {}, loss {}, generate data time: {:.2f} s, step train time: {:.2f} s'\
-                    .format(step, loss_out, gd_b - gd_a, tr_b - tr_a)
-                self.loss_log.write('{} {}\n'.format(step, loss_out))
+            total_loss += loss_out
+            count += 1
 
-            if step != 0 and step % 10000 == 0:
+            if step % 100 == 0:
+                avg_loss = total_loss/count
+                print 'step {}, loss {}, generate data time: {:.2f} s, step train time: {:.2f} s'\
+                    .format(step, avg_loss, gd_b - gd_a, tr_b - tr_a)
+                self.loss_log.write('{} {}\n'.format(step, avg_loss))
+                total_loss = 0
+                count = 0
+
+            if step % 3000 == 0:
+                model_path = saver.save(session, os.path.join(self.model_dir, 'fcn'))
+                j_dict = json.load(open(self.acc_file))
+                j_dict['step'] = step
+                json.dump(j_dict, open(self.acc_file, 'w'), indent=4)
+                print 'Save model at {}'.format(model_path)
+
+            if step != 0 and step % 50000 == 0:
                 print 'Evaluate validate set ... '
                 iou_acc_total = 0
                 val_sample_count = self.datagen.get_validate_sample_count()
@@ -159,12 +179,11 @@ class FCN():
 
                     iou_acc_total += iou_acc
 
-                    ew_a = time.time()
-                    tools.mask_to_img(mask, self.out_mask_dir, sample_name)
-                    ew_b = time.time()
+                    if i % 50 == 0:
+                        tools.mask_to_img(mask, self.out_mask_dir, sample_name)
 
-                    print '[{}] evaluate {}, accuracy: {:.2f}, load: {:.2f} s, evaluate: {:.2f} s, write: {:.2f} s'\
-                        .format(i, sample_name, iou_acc, ed_b - ed_a, ee_b - ee_a, ew_b - ew_a)
+                    print '[{}] evaluate {}, accuracy: {:.2f}, load: {:.2f} s, evaluate: {:.2f} s'\
+                        .format(i, sample_name, iou_acc, ed_b - ed_a, ee_b - ee_a)
 
                 avg_iou_acc = iou_acc_total/val_sample_count
 
@@ -228,13 +247,13 @@ class FCN():
             for j, b in enumerate(a):
                 # b is one patch of the fcn result
                 # convert logistic score to 0, 1 classification
-                b = np.reshape(b, [256, 256])
+                b = np.reshape(b, [self.input_size, self.input_size])
                 b = np.round(b).astype(np.int8)
                 for h, c in enumerate(b):
                     for w, d in enumerate(c):
                         # d is one pixel classification
-                        if i*256+h < 1280 and j*256+w < 1918:
-                            mask[i*256+h][j*256+w] = d
+                        if i*self.input_size+h < 1280 and j*self.input_size+w < 1918:
+                            mask[i*self.input_size+h][j*self.input_size+w] = d
 
         # calculate the iou accuracy
         mask = mask.astype(np.int8)
