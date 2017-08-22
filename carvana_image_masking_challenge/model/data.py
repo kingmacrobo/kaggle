@@ -7,10 +7,9 @@ from PIL import Image
 
 class DataGenerator():
 
-    def __init__(self, train_list_file, test_list_file, train_mask_dir, debug_dir=None, train_height=512, train_width=512):
+    def __init__(self, train_list_file, test_list_file, train_mask_dir, debug_dir=None, input_size=1024):
 
-        self.train_heigth = train_height
-        self.train_width = train_width
+        self.input_size = input_size
 
         with open(test_list_file, 'r') as f:
             lines = f.readlines()
@@ -65,6 +64,7 @@ class DataGenerator():
             print i, img_path
             name = img_path.split('/')[-1]
             img = cv2.imread(img_path)
+            img = cv2.resize(img, (self.input_size, self.input_size), interpolation=cv2.INTER_LINEAR)
             self.validate_images.append(img)
 
             mask_path = os.path.join(self.train_mask_dir, name.split('.')[0] + '_mask.gif')
@@ -84,61 +84,37 @@ class DataGenerator():
             print i, img_path
             name = img_path.split('/')[-1]
             img = cv2.imread(img_path)
+            img = cv2.resize(img, (self.input_size, self.input_size), interpolation=cv2.INTER_LINEAR)
             self.train_images.append(img)
 
             mask_path = os.path.join(self.train_mask_dir, name.split('.')[0] + '_mask.gif')
             im = Image.open(mask_path)
             mask = np.array(im)
+            mask = cv2.resize(mask, (self.input_size, self.input_size), interpolation=cv2.INTER_LINEAR)
+            mask = np.round(mask).astype(np.int32)
             self.train_gt_masks.append(mask)
 
         print 'Random load 1000 train images done! ^_^ \n'
 
-    def load_image_from_file(self, img_path):
-        img = cv2.imread(img_path)
-        return img
-
-    def load_gt_mask_from_file(self, img_path):
-        name = img_path.split('/')[-1].split('.')[0]
-        mask_path = os.path.join(self.train_mask_dir, name + '_mask.gif')
-        im = Image.open(mask_path)
-        mask = np.array(im)
-        return mask
-
-    def random_crop(self, image, gt_mask, h, w):
-        height, width = image.shape[:-1]
-
-        top = random.randint(0, height - h)
-        bot = top + h
-
-        left = random.randint(0, width - w)
-        right = left + w
-
-        croped_image = image[top: bot, left: right, : ].copy()/255.0
-        croped_gt_mask = gt_mask[top: bot, left: right].copy()
-
-        return croped_image, croped_gt_mask
-
-    def generate_batch_train_samples(self, batch_size=64):
+    def generate_batch_train_samples(self, batch_size):
         step = 0
         while True:
             # load 1000 train images to memory
-            if step % 50000 == 0:
+            if step % 5000 == 0:
                 self.load_train_images()
 
             batch_images = []
             batch_gt_masks = []
-            for i in xrange(batch_size):
+            for i in range(batch_size):
                 index = random.randint(0, len(self.selected_train)-1)
-                image = self.train_images[index]
+                img = self.train_images[index]/255.0
                 gt_mask = self.train_gt_masks[index]
 
-                c_img, c_gt_mask = self.random_crop(image, gt_mask, self.train_heigth, self.train_width)
-
                 if self.debug:
-                    self.save_debug_image(str(i), c_img, c_gt_mask)
+                    self.save_debug_image(str(i), img, gt_mask)
 
-                batch_images.append(c_img)
-                batch_gt_masks.append(c_gt_mask.flatten())
+                batch_images.append(img)
+                batch_gt_masks.append(gt_mask)
 
             batch_images = np.asarray(batch_images)
             batch_gt_masks = np.asarray(batch_gt_masks)
@@ -164,7 +140,7 @@ class DataGenerator():
     def generate_test_samples(self):
         for img_path in self.test_list:
             name = img_path.split('/')[-1]
-            img = cv2.imread(img_path)
+            img = cv2.imread(img_path)/255.0
             yield img, name
 
     def save_debug_image(self, name, image, mask):
