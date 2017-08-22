@@ -64,7 +64,7 @@ class DataGenerator():
             print i, img_path
             name = img_path.split('/')[-1]
             img = cv2.imread(img_path)
-            img = cv2.resize(img, (self.input_size, self.input_size), interpolation=cv2.INTER_LINEAR)
+            img = cv2.resize(img, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
             self.validate_images.append(img)
 
             mask_path = os.path.join(self.train_mask_dir, name.split('.')[0] + '_mask.gif')
@@ -84,13 +84,13 @@ class DataGenerator():
             print i, img_path
             name = img_path.split('/')[-1]
             img = cv2.imread(img_path)
-            img = cv2.resize(img, (self.input_size, self.input_size), interpolation=cv2.INTER_LINEAR)
+            img = cv2.resize(img, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
             self.train_images.append(img)
 
             mask_path = os.path.join(self.train_mask_dir, name.split('.')[0] + '_mask.gif')
             im = Image.open(mask_path)
             mask = np.array(im)
-            mask = cv2.resize(mask, (self.input_size, self.input_size), interpolation=cv2.INTER_LINEAR)
+            mask = cv2.resize(mask, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
             mask = np.round(mask).astype(np.int32)
             self.train_gt_masks.append(mask)
 
@@ -147,7 +147,8 @@ class DataGenerator():
         img_path = os.path.join(self.debug_train, name + '.jpg')
         mask_path = os.path.join(self.debug_mask, name + '.gif')
 
-        mask = mask*255
+        mask = mask * 255
+        image = image * 255
         cv2.imwrite(img_path, image)
         Image.fromarray(mask).save(mask_path)
 

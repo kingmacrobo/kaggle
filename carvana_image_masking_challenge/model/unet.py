@@ -147,8 +147,8 @@ class UNET():
             if step != 0 and step % 1000 == 0:
                 print 'Evaluate validate set ... '
                 iou_acc_total = 0
-                #val_sample_count = self.datagen.get_validate_sample_count()
-                val_sample_count = 1
+                val_sample_count = self.datagen.get_validate_sample_count()
+                #val_sample_count = 1
                 validate_samples = self.datagen.generate_validate_samples()
                 for i in xrange(val_sample_count):
                     ed_a = time.time()
@@ -227,7 +227,7 @@ class UNET():
         height, width = eval_y.shape
 
         eval_out = np.round(eval_out)
-        mask = cv2.resize(eval_out, (width, height), interpolation=cv2.INTER_LINEAR)
+        mask = cv2.resize(eval_out, (width, height), interpolation=cv2.INTER_CUBIC)
         mask = np.round(mask).astype(np.int32)
 
         # calculate the iou accuracy

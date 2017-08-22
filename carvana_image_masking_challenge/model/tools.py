@@ -28,7 +28,7 @@ def mask_to_img(mask, out_dir, sample_name):
         os.mkdir(out_dir)
 
     dst = os.path.join(out_dir, sample_name + '_mask.gif')
-    mask = mask*255
+    mask = mask * 255
     Image.fromarray(mask).save(dst)
 
 
