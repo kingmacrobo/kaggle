@@ -5,6 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 import tools
+from layers import conv2d, maxpooling
 
 class FCN():
     def __init__(self, datagen, batch_size=8, lr=0.001, dropout=0.5, model_dir='checkpoints', out_mask_dir= 'out_mask'):
@@ -23,63 +24,39 @@ class FCN():
 
         print 'batch size: {}, learning reate: {}, dropout: {}\n'.format(self.batch_size, self.lr, self.dropout)
 
-    def conv2d(self, x, filter, scope, activation='relu'):
-        with tf.variable_scope(scope):
-            w = self.weight_variable(filter)
-            b = self.bias_variable([filter[-1]])
-            x = tf.nn.conv2d(x, w, strides=[1, 1, 1, 1], padding='SAME')
-            x = tf.nn.bias_add(x, b)
-
-            if activation == 'sigmoid':
-                return tf.nn.sigmoid(x)
-            elif activation == 'no':
-                return x
-
-            return tf.nn.relu(x)
-
-    def maxpooling(self, x, k=2):
-        return tf.nn.max_pool(x, ksize=[1, k, k, 1], strides=[1, k, k, 1], padding='SAME')
-
-    def weight_variable(self, shape):
-        return tf.get_variable("weights",
-                               shape,
-                               initializer=tf.truncated_normal_initializer(stddev=0.1))
-
-    def bias_variable(self, shape):
-        return tf.get_variable("biases", shape, initializer=tf.constant_initializer(0.1))
 
     def fcn_net(self, x, train=True):
-        conv1 = self.conv2d(x, [3, 3, 3, 32], 'conv1')
-        maxp1 = self.maxpooling(conv1)
+        conv1 = conv2d(x, [3, 3, 3, 32], 'conv1')
+        maxp1 = maxpooling(conv1)
 
-        conv2 = self.conv2d(maxp1, [3, 3, 32, 32], 'conv2')
-        maxp2 = self.maxpooling(conv2)
+        conv2 = conv2d(maxp1, [3, 3, 32, 32], 'conv2')
+        maxp2 = maxpooling(conv2)
 
-        conv3 = self.conv2d(maxp2, [3, 3, 32, 64], 'conv3')
-        maxp3 = self.maxpooling(conv3)
+        conv3 = conv2d(maxp2, [3, 3, 32, 64], 'conv3')
+        maxp3 = maxpooling(conv3)
 
-        conv4 = self.conv2d(maxp3, [3, 3, 64, 64], 'conv4')
-        maxp4 = self.maxpooling(conv4)
+        conv4 = conv2d(maxp3, [3, 3, 64, 64], 'conv4')
+        maxp4 = maxpooling(conv4)
 
-        conv5 = self.conv2d(maxp4, [3, 3, 64, 128], 'conv5')
-        maxp5 = self.maxpooling(conv5)
+        conv5 = conv2d(maxp4, [3, 3, 64, 128], 'conv5')
+        maxp5 = maxpooling(conv5)
 
-        conv6 = self.conv2d(maxp5, [3, 3, 128, 128], 'conv6')
-        maxp6 = self.maxpooling(conv6)
+        conv6 = conv2d(maxp5, [3, 3, 128, 128], 'conv6')
+        maxp6 = maxpooling(conv6)
 
-        conv7 = self.conv2d(maxp6, [3, 3, 128, 256], 'conv7')
-        maxp7 = self.maxpooling(conv7)
+        conv7 = conv2d(maxp6, [3, 3, 128, 256], 'conv7')
+        maxp7 = maxpooling(conv7)
 
-        conv8 = self.conv2d(maxp7, [3, 3, 256, 256], 'conv8')
-        maxp8 = self.maxpooling(conv8)
+        conv8 = conv2d(maxp7, [3, 3, 256, 256], 'conv8')
+        maxp8 = maxpooling(conv8)
 
-        conv9 = self.conv2d(maxp8, [3, 3, 256, 512], 'conv9')
-        maxp9 = self.maxpooling(conv9)
+        conv9 = conv2d(maxp8, [3, 3, 256, 512], 'conv9')
+        maxp9 = maxpooling(conv9)
 
         drop = tf.nn.dropout(maxp9, self.dropout)
 
         # 1x1 convolution + sigmoid activation
-        net = self.conv2d(drop, [1, 1, 512, self.input_size*self.input_size], 'conv10', activation='no')
+        net = conv2d(drop, [1, 1, 512, self.input_size*self.input_size], 'conv10', activation='no')
 
         # squeeze the last two dimension in train
         if train:
