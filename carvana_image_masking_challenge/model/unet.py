@@ -9,7 +9,7 @@ import tools
 from layers import conv2d, deconv2d, maxpooling, concat
 
 class UNET():
-    def __init__(self, datagen, batch_size=2, lr=0.001, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
+    def __init__(self, datagen, batch_size=1, lr=0.0005, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
 
         self.datagen = datagen
         self.batch_size = batch_size
@@ -26,7 +26,7 @@ class UNET():
         print 'batch size: {}, learning reate: {}, dropout: {}\n'.format(self.batch_size, self.lr, self.dropout)
 
 
-    def u_net(self, x, layers=5, base_channel=64):
+    def u_net(self, x, layers=4, base_channel=64):
         ds_layers = {}
 
         # down sample layers
@@ -62,7 +62,7 @@ class UNET():
             x = tf.nn.dropout(x, self.dropout)
 
         # add 1x1 convolution layer to change channel to one
-        x = conv2d(x, [1, 1, base_channel, 1], 'conv_1x1')
+        x = conv2d(x, [1, 1, base_channel, 1], 'conv_1x1', activation='no')
 
         logits = tf.squeeze(x, axis=3)
 
@@ -81,7 +81,7 @@ class UNET():
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
         learning_rate = tf.train.exponential_decay(self.lr, global_step,
-                                                   10000, 0.95, staircase=True)
+                                                   3000, 0.95, staircase=True)
 
         train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss, global_step=global_step)
 
@@ -127,13 +127,13 @@ class UNET():
 
             if step % 10 == 0:
                 avg_loss = total_loss/count
-                print 'step {}, loss {}, generate data time: {:.2f} s, step train time: {:.2f} s'\
-                    .format(step, avg_loss, gd_b - gd_a, tr_b - tr_a)
+                print 'global step {}, epoch {}, step {}, loss {}, generate data time: {:.2f} s, step train time: {:.2f} s'\
+                    .format(step, step / 4493, step % 4493, avg_loss, gd_b - gd_a, tr_b - tr_a)
                 self.loss_log.write('{} {}\n'.format(step, avg_loss))
                 total_loss = 0
                 count = 0
 
-            if step != 0 and step % 100 == 0:
+            if step != 0 and step % 500 == 0:
                 model_path = saver.save(session, os.path.join(self.model_dir, 'unet'))
                 if os.path.exists(self.acc_file):
                     j_dict = json.load(open(self.acc_file))
@@ -144,11 +144,10 @@ class UNET():
                 json.dump(j_dict, open(self.acc_file, 'w'), indent=4)
                 print 'Save model at {}'.format(model_path)
 
-            if step != 0 and step % 1000 == 0:
+            if step != 0 and step % 3000 == 0:
                 print 'Evaluate validate set ... '
                 iou_acc_total = 0
                 val_sample_count = self.datagen.get_validate_sample_count()
-                #val_sample_count = 1
                 validate_samples = self.datagen.generate_validate_samples()
                 for i in xrange(val_sample_count):
                     ed_a = time.time()
@@ -162,7 +161,7 @@ class UNET():
 
                     iou_acc_total += iou_acc
 
-                    if i % 50 == 0:
+                    if i % 5 == 0:
                         tools.mask_to_img(mask, self.out_mask_dir, sample_name)
 
                     print '[{}] evaluate {}, accuracy: {:.2f}, load: {:.2f} s, evaluate: {:.2f} s'\
@@ -176,7 +175,7 @@ class UNET():
                 # save model if get higher accuracy
                 if avg_iou_acc > last_acc:
                     last_acc = avg_iou_acc
-                    model_path = saver.save(session, os.path.join(self.model_dir, 'fcn'))
+                    model_path = saver.save(session, os.path.join(self.model_dir, 'best'))
                     acc_json = {'accuracy': last_acc, 'step': step}
                     with open(self.acc_file, 'w') as f:
                         json.dump(acc_json, f, indent=4)
@@ -221,8 +220,6 @@ class UNET():
     def iou_accuracy(self, eval_out, eval_y):
         # remove the first dimension since the size is 1
         eval_out = np.squeeze(eval_out, axis=0)
-
-        print eval_out.shape
 
         height, width = eval_y.shape
 

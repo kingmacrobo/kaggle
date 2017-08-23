@@ -14,8 +14,8 @@ flags.DEFINE_string('debug_dir', '', 'the debug directory')
 FLAGS = flags.FLAGS
 
 def main():
-    datagen = data.DataGenerator(FLAGS.train_list, FLAGS.test_list, FLAGS.train_mask_dir, debug_dir=FLAGS.debug_dir)
-    #datagen = data.DataGenerator(FLAGS.train_list, FLAGS.test_list, FLAGS.train_mask_dir)
+    #datagen = data.DataGenerator(FLAGS.train_list, FLAGS.test_list, FLAGS.train_mask_dir, debug_dir=FLAGS.debug_dir)
+    datagen = data.DataGenerator(FLAGS.train_list, FLAGS.test_list, FLAGS.train_mask_dir)
     model = unet.UNET(datagen, out_mask_dir=FLAGS.out_mask_dir, model_dir=FLAGS.model_dir)
     with tf.Session() as session:
         model.train(session)
