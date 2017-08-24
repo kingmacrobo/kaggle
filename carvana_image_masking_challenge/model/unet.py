@@ -164,7 +164,7 @@ class UNET():
                     if i % 5 == 0:
                         tools.mask_to_img(mask, self.out_mask_dir, sample_name)
 
-                    print '[{}] evaluate {}, accuracy: {:.2f}, load: {:.2f} s, evaluate: {:.2f} s'\
+                    print '[{}] evaluate {}, accuracy: {:.5f}, load: {:.2f} s, evaluate: {:.2f} s'\
                         .format(i, sample_name, iou_acc, ed_b - ed_a, ee_b - ee_a)
 
                 avg_iou_acc = iou_acc_total/val_sample_count
