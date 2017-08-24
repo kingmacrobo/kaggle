@@ -83,7 +83,10 @@ class UNET():
         learning_rate = tf.train.exponential_decay(self.lr, global_step,
                                                    3000, 0.95, staircase=True)
 
-        train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(loss, global_step=global_step)
+        train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(
+            loss,
+            global_step=global_step,
+            aggregation_method=tf.AggregationMethod.EXPERIMENTAL_ACCUMULATE_N)
 
         saver = tf.train.Saver(max_to_keep=3)
 
