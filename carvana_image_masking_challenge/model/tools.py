@@ -55,18 +55,54 @@ def iou_check(mask_a, mask_b):
 
     return accuracy
 
+def detect_edge(mask):
+    height, width = mask.shape
+    for h, row in enumerate(mask):
+        for w, p in enumerate(row):
+            if p == 1:
+                find = False
+                for x in range(-1, 2):
+                    for y in range(-1, 2):
+                        px = x + h
+                        py = y + w
+                        if px > height-1 or px < 0 or py > width - 1 or py < 0:
+                            continue
+                        if mask[px][py] == 0:
+                            mask[h][w] = 2
+                            find = True
+                            break
+                    if find:
+                        break
+
+    return mask
+
+def batch_edge(mask_list_file, out_dir):
+    import os
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
+
+    mask_list = open(mask_list_file, 'r').readlines()
+
+    for i, img_path in enumerate(mask_list):
+        img_path = img_path.strip()
+        name = img_path.split('/')[-1]
+        out_path = os.path.join(out_dir, name)
+
+        mask = np.array(Image.open(img_path))
+        mask = cv2.resize(mask, (1024, 1024), interpolation=cv2.INTER_AREA)
+        mask = np.round(mask).astype(np.int32)
+        mask = detect_edge(mask)
+        Image.fromarray(mask).save(out_path)
+        print i, out_path
+
+
+
 def main():
     import sys
-    from PIL import Image
 
     a = sys.argv[1]
     b = sys.argv[2]
-
-    img_a = cv2.imread(a, cv2.IMREAD_GRAYSCALE)
-    img_b = np.array(Image.open(b))
-
-    print iou_check(img_a, img_b)
-
+    batch_edge(a, b)
 
 if __name__ == '__main__':
     main()
