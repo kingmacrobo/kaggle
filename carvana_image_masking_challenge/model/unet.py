@@ -9,7 +9,7 @@ import tools
 from layers import conv2d, deconv2d, maxpooling, concat
 
 class UNET():
-    def __init__(self, datagen, batch_size=1, lr=0.0005, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
+    def __init__(self, datagen, batch_size=1, lr=0.001, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
 
         self.datagen = datagen
         self.batch_size = batch_size
@@ -26,7 +26,7 @@ class UNET():
         print 'batch size: {}, learning reate: {}, dropout: {}\n'.format(self.batch_size, self.lr, self.dropout)
 
 
-    def u_net(self, x, layers=4, base_channel=64):
+    def u_net(self, x, layers=6, base_channel=32):
         ds_layers = {}
 
         # down sample layers
