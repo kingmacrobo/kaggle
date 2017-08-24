@@ -95,8 +95,6 @@ def batch_edge(mask_list_file, out_dir):
         Image.fromarray(mask).save(out_path)
         print i, out_path
 
-
-
 def main():
     import sys
 

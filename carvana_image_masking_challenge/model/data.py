@@ -7,7 +7,7 @@ from PIL import Image
 
 class DataGenerator():
 
-    def __init__(self, train_list_file, test_list_file, train_mask_dir, debug_dir=None, input_size=1024):
+    def __init__(self, train_list_file, test_list_file, train_mask_dir, train_mask_edge_dir, debug_dir=None, input_size=1024):
 
         self.input_size = input_size
 
@@ -18,6 +18,8 @@ class DataGenerator():
                 self.test_list.append(line.strip())
 
         self.train_mask_dir = train_mask_dir
+
+        self.train_mask_edge_dir = train_mask_edge_dir
 
         self.split_train_data(train_list_file)
 
@@ -81,11 +83,10 @@ class DataGenerator():
 
     def load_gt_mask_from_file(self, img_path):
         name = img_path.split('/')[-1].split('.')[0]
-        mask_path = os.path.join(self.train_mask_dir, name + '_mask.gif')
+        mask_path = os.path.join(self.train_mask_edge_dir, name + '_mask.gif')
         im = Image.open(mask_path)
         mask = np.array(im)
-        mask = cv2.resize(mask, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
-        mask = np.round(mask).astype(np.int32)
+        mask = mask.astype(np.int8)
         return mask
 
     def load_train_images(self):
@@ -102,33 +103,20 @@ class DataGenerator():
             img = cv2.resize(img, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
             self.train_images.append(img)
 
-            mask_path = os.path.join(self.train_mask_dir, name.split('.')[0] + '_mask.gif')
+            mask_path = os.path.join(self.train_mask_edge_dir, name.split('.')[0] + '_mask.gif')
             im = Image.open(mask_path)
             mask = np.array(im)
-            mask = cv2.resize(mask, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
-            mask = np.round(mask).astype(np.int32)
+            mask = mask.astype(np.int8)
             self.train_gt_masks.append(mask)
 
         print 'Random load 1000 train images done! ^_^ \n'
 
     def generate_batch_train_samples(self, batch_size):
-        #step = 0
         index = 0
         while True:
-            # load 1000 train images to memory
-            '''
-            if step % 5000 == 0:
-                self.load_train_images()
-            '''
-
             batch_images = []
             batch_gt_masks = []
             for i in range(batch_size):
-                '''
-                index = random.randint(0, len(self.selected_train)-1)
-                img = self.train_images[index]/255.0
-                gt_mask = self.train_gt_masks[index]
-                '''
                 img_path = self.train_list[index % len(self.train_list)]
                 img = self.load_image_from_file(img_path)
                 gt_mask = self.load_gt_mask_from_file(img_path)
@@ -142,8 +130,6 @@ class DataGenerator():
 
             batch_images = np.asarray(batch_images)
             batch_gt_masks = np.asarray(batch_gt_masks)
-
-            #step += 1
 
             yield batch_images, batch_gt_masks
 

@@ -26,7 +26,7 @@ class UNET():
         print 'batch size: {}, learning reate: {}, dropout: {}\n'.format(self.batch_size, self.lr, self.dropout)
 
 
-    def u_net(self, x, layers=4, base_channel=64):
+    def u_net(self, x, layers=5, base_channel=64):
         ds_layers = {}
 
         # down sample layers
@@ -61,8 +61,8 @@ class UNET():
             x = conv2d(x, [3, 3, f_channels, f_channels], layer_name + '_conv_2')
             x = tf.nn.dropout(x, self.dropout)
 
-        # add 1x1 convolution layer to change channel to one
-        x = conv2d(x, [1, 1, base_channel, 1], 'conv_1x1', activation='no')
+        # add 1x1 convolution layer to change channel to 3
+        x = conv2d(x, [1, 1, base_channel, 3], 'conv_1x1', activation='no')
 
         logits = tf.squeeze(x, axis=3)
 
@@ -75,7 +75,7 @@ class UNET():
         net = self.u_net(x)
 
         # sigmoid cross entropy loss
-        loss_sum = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net), axis=[1, 2])
+        loss_sum = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=net), axis=[1, 2])
         loss = tf.reduce_mean(loss_sum)
 
         global_step = tf.Variable(0, name='global_step', trainable=False)
@@ -93,7 +93,7 @@ class UNET():
         # evaluate fcn
         tf.get_variable_scope().reuse_variables()
         eval_x = tf.placeholder(tf.float32, [1, self.input_size, self.input_size, 3])
-        eval_net = tf.nn.sigmoid(self.u_net(eval_x))
+        eval_net = tf.arg_max(tf.nn.softmax(self.u_net(eval_x)), 3)
 
         session.run(tf.global_variables_initializer())
 
@@ -190,7 +190,7 @@ class UNET():
     def eval(self, session):
         # evaluate fcn
         eval_x = tf.placeholder(tf.float32, [None, None, None, 3])
-        eval_net = tf.nn.sigmoid(self.u_net(eval_x, train=False))
+        eval_net = tf.arg_max(tf.nn.softmax(self.u_net(eval_x)), 3)
 
         # load the model
         saver = tf.train.Saver(max_to_keep=3)
@@ -226,9 +226,10 @@ class UNET():
 
         height, width = eval_y.shape
 
-        eval_out = np.round(eval_out)
+        eval_out[eval_out==2] = 1
+
         mask = cv2.resize(eval_out, (width, height), interpolation=cv2.INTER_CUBIC)
-        mask = np.round(mask).astype(np.int32)
+        mask = np.round(mask).astype(np.int8)
 
         # calculate the iou accuracy
         s = np.sum(mask)
