@@ -9,7 +9,7 @@ import tools
 from layers import conv2d, deconv2d, maxpooling, concat
 
 class UNET():
-    def __init__(self, datagen, batch_size=1, lr=0.0005, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
+    def __init__(self, datagen, batch_size=1, lr=0.0001, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
 
         self.datagen = datagen
         self.batch_size = batch_size
@@ -26,7 +26,7 @@ class UNET():
         print 'batch size: {}, learning reate: {}, dropout: {}\n'.format(self.batch_size, self.lr, self.dropout)
 
 
-    def u_net(self, x, layers=5, base_channel=64):
+    def u_net(self, x, layers=6, base_channel=32):
         ds_layers = {}
 
         # down sample layers
@@ -62,16 +62,14 @@ class UNET():
             x = tf.nn.dropout(x, self.dropout)
 
         # add 1x1 convolution layer to change channel to 3
-        x = conv2d(x, [1, 1, base_channel, 3], 'conv_1x1', activation='no')
-
-        logits = tf.squeeze(x, axis=3)
+        logits = conv2d(x, [1, 1, base_channel, 3], 'conv_1x1', activation='no')
 
         return logits
 
     def train(self, session):
         # train fcn
         x = tf.placeholder(tf.float32, [self.batch_size, self.input_size, self.input_size, 3])
-        y = tf.placeholder(tf.float32, [self.batch_size, self.input_size, self.input_size])
+        y = tf.placeholder(tf.int32, [self.batch_size, self.input_size, self.input_size])
         net = self.u_net(x)
 
         # sigmoid cross entropy loss
@@ -227,9 +225,10 @@ class UNET():
         height, width = eval_y.shape
 
         eval_out[eval_out==2] = 1
+        eval_out = eval_out.astype(np.float32)
 
         mask = cv2.resize(eval_out, (width, height), interpolation=cv2.INTER_CUBIC)
-        mask = np.round(mask).astype(np.int8)
+        mask = np.round(mask).astype(np.int32)
 
         # calculate the iou accuracy
         s = np.sum(mask)
