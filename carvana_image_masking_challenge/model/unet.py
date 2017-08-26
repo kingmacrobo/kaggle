@@ -26,7 +26,7 @@ class UNET():
         print 'batch size: {}, learning reate: {}, dropout: {}\n'.format(self.batch_size, self.lr, self.dropout)
 
 
-    def u_net(self, x, layers=5, base_channel=64):
+    def u_net(self, x, layers=6, base_channel=32):
         ds_layers = {}
 
         # down sample layers
@@ -85,8 +85,8 @@ class UNET():
 
         train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(
             loss,
-            global_step=global_step,
-            aggregation_method=tf.AggregationMethod.EXPERIMENTAL_ACCUMULATE_N)
+            global_step=global_step)
+            #aggregation_method=tf.AggregationMethod.EXPERIMENTAL_ACCUMULATE_N)
 
         saver = tf.train.Saver(max_to_keep=3)
 
