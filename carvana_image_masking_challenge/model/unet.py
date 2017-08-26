@@ -9,7 +9,7 @@ import tools
 from layers import conv2d, deconv2d, maxpooling, concat
 
 class UNET():
-    def __init__(self, datagen, batch_size=1, lr=0.0005, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
+    def __init__(self, datagen, batch_size=1, lr=0.0001, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
 
         self.datagen = datagen
         self.batch_size = batch_size
@@ -81,7 +81,7 @@ class UNET():
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
         learning_rate = tf.train.exponential_decay(self.lr, global_step,
-                                                   3000, 0.95, staircase=True)
+                                                   4000, 0.95, staircase=True)
 
         train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(
             loss,
