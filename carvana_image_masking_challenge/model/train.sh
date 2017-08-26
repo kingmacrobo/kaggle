@@ -5,4 +5,5 @@ python train.py --model_dir=${BASE_DIR}/checkpoints \
                 --train_list=${BASE_DIR}/data/train/imgs.txt \
                 --test_list=${BASE_DIR}/data/train/imgs.txt \
                 --train_mask_dir=${BASE_DIR}/data/train_masks \
+                --train_mask_edge_dir=${BASE_DIR}/data/train_mask_edge \
                 --debug_dir=${BASE_DIR}/debug

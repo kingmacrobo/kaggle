@@ -62,16 +62,14 @@ class UNET():
             x = tf.nn.dropout(x, self.dropout)
 
         # add 1x1 convolution layer to change channel to 3
-        x = conv2d(x, [1, 1, base_channel, 3], 'conv_1x1', activation='no')
-
-        logits = tf.squeeze(x, axis=3)
+        logits = conv2d(x, [1, 1, base_channel, 3], 'conv_1x1', activation='no')
 
         return logits
 
     def train(self, session):
         # train fcn
         x = tf.placeholder(tf.float32, [self.batch_size, self.input_size, self.input_size, 3])
-        y = tf.placeholder(tf.float32, [self.batch_size, self.input_size, self.input_size])
+        y = tf.placeholder(tf.int32, [self.batch_size, self.input_size, self.input_size])
         net = self.u_net(x)
 
         # sigmoid cross entropy loss
@@ -227,9 +225,10 @@ class UNET():
         height, width = eval_y.shape
 
         eval_out[eval_out==2] = 1
+        eval_out = eval_out.astype(np.float32)
 
         mask = cv2.resize(eval_out, (width, height), interpolation=cv2.INTER_CUBIC)
-        mask = np.round(mask).astype(np.int8)
+        mask = np.round(mask).astype(np.int32)
 
         # calculate the iou accuracy
         s = np.sum(mask)

@@ -86,7 +86,7 @@ class DataGenerator():
         mask_path = os.path.join(self.train_mask_edge_dir, name + '_mask.gif')
         im = Image.open(mask_path)
         mask = np.array(im)
-        mask = mask.astype(np.int8)
+        mask = mask.astype(np.int32)
         return mask
 
     def load_train_images(self):
@@ -106,7 +106,7 @@ class DataGenerator():
             mask_path = os.path.join(self.train_mask_edge_dir, name.split('.')[0] + '_mask.gif')
             im = Image.open(mask_path)
             mask = np.array(im)
-            mask = mask.astype(np.int8)
+            mask = mask.astype(np.int32)
             self.train_gt_masks.append(mask)
 
         print 'Random load 1000 train images done! ^_^ \n'
