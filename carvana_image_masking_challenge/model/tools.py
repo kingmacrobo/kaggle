@@ -31,6 +31,18 @@ def mask_to_img(mask, out_dir, sample_name):
     mask = mask * 255
     Image.fromarray(mask).save(dst)
 
+def eval_to_img(eval_out, out_dir, sample_name):
+    eval_out = np.squeeze(eval_out, axis=0)
+
+    if not os.path.exists(out_dir):
+        os.mkdir(out_dir)
+
+    dst = os.path.join(out_dir, sample_name + '_eval.gif')
+    eval_out = eval_out.astype(np.float32)
+    mask = eval_out * (255/2)
+    mask = cv2.resize(mask, (1918, 1280), interpolation=cv2.INTER_CUBIC)
+    Image.fromarray(mask).save(dst)
+
 
 def load_mask(img_path):
     mask = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)

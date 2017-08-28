@@ -9,7 +9,7 @@ import tools
 from layers import conv2d, deconv2d, maxpooling, concat
 
 class UNET():
-    def __init__(self, datagen, batch_size=1, lr=0.0001, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
+    def __init__(self, datagen, batch_size=1, lr=0.00001, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
 
         self.datagen = datagen
         self.batch_size = batch_size
@@ -26,7 +26,7 @@ class UNET():
         print 'batch size: {}, learning reate: {}, dropout: {}\n'.format(self.batch_size, self.lr, self.dropout)
 
 
-    def u_net(self, x, layers=6, base_channel=32):
+    def u_net(self, x, layers=4, base_channel=64):
         ds_layers = {}
 
         # down sample layers
@@ -72,14 +72,15 @@ class UNET():
         y = tf.placeholder(tf.int32, [self.batch_size, self.input_size, self.input_size])
         net = self.u_net(x)
 
-        # sigmoid cross entropy loss
+        # softmax cross entropy loss
         loss_sum = tf.reduce_sum(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=net), axis=[1, 2])
         loss = tf.reduce_mean(loss_sum)
+        #loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=y, logits=net))
 
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
         learning_rate = tf.train.exponential_decay(self.lr, global_step,
-                                                   4000, 0.95, staircase=True)
+                                                   50000, 0.95, staircase=True)
 
         train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(
             loss,
@@ -91,7 +92,7 @@ class UNET():
         # evaluate fcn
         tf.get_variable_scope().reuse_variables()
         eval_x = tf.placeholder(tf.float32, [1, self.input_size, self.input_size, 3])
-        eval_net = tf.arg_max(tf.nn.softmax(self.u_net(eval_x)), 3)
+        eval_net = tf.argmax(tf.nn.softmax(self.u_net(eval_x)), 3)
 
         session.run(tf.global_variables_initializer())
 
@@ -145,7 +146,7 @@ class UNET():
                 json.dump(j_dict, open(self.acc_file, 'w'), indent=4)
                 print 'Save model at {}'.format(model_path)
 
-            if step != 0 and step % 3000 == 0:
+            if step != 0 and step % 4493 == 0:
                 print 'Evaluate validate set ... '
                 iou_acc_total = 0
                 val_sample_count = self.datagen.get_validate_sample_count()
@@ -157,15 +158,17 @@ class UNET():
 
                     ee_a = time.time()
                     val_out = session.run(eval_net, feed_dict={eval_x: val_one_x})
-                    iou_acc, mask = self.iou_accuracy(val_out, val_one_y)
+                    mask = val_out
+                    iou_acc, mask = self.iou_accuracy(mask, val_one_y)
                     ee_b = time.time()
 
                     iou_acc_total += iou_acc
 
                     if i % 5 == 0:
                         tools.mask_to_img(mask, self.out_mask_dir, sample_name)
+                        tools.eval_to_img(val_out, self.out_mask_dir, sample_name)
 
-                    print '[{}] evaluate {}, accuracy: {:.2f}, load: {:.2f} s, evaluate: {:.2f} s'\
+                    print '[{}] evaluate {}, accuracy: {:.5f}, load: {:.2f} s, evaluate: {:.2f} s'\
                         .format(i, sample_name, iou_acc, ed_b - ed_a, ee_b - ee_a)
 
                 avg_iou_acc = iou_acc_total/val_sample_count
@@ -188,7 +191,7 @@ class UNET():
     def eval(self, session):
         # evaluate fcn
         eval_x = tf.placeholder(tf.float32, [None, None, None, 3])
-        eval_net = tf.arg_max(tf.nn.softmax(self.u_net(eval_x)), 3)
+        eval_net = tf.argmax(tf.nn.softmax(self.u_net(eval_x)), 3)
 
         # load the model
         saver = tf.train.Saver(max_to_keep=3)
