@@ -36,11 +36,12 @@ def conv2d(x, w_shape, scope, activation='relu', bn=True):
         return tf.nn.relu(x)
 
 # weight shape: [filter_h, filter_w, output_channels, input_channels]
-def deconv2d(x, w_shape, scope, stride=2):
+def deconv2d(x, w_shape, ds_shape, scope, stride=2):
     with tf.variable_scope(scope):
         w = weight_variable(w_shape)
         x_shape = tf.shape(x)
-        output_shape = tf.stack([x_shape[0], x_shape[1]*2, x_shape[2]*2, x_shape[3]//2])
+        #output_shape = tf.stack([x_shape[0], x_shape[1]*2, x_shape[2]*2, x_shape[3]//2])
+        output_shape = tf.stack([x_shape[0], ds_shape[1], ds_shape[2], x_shape[3]//2])
         return tf.nn.conv2d_transpose(x, w, output_shape, strides=[1, stride, stride, 1], padding='SAME')
 
 def maxpooling(x, k=2):

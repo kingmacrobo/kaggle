@@ -21,13 +21,12 @@ class UNET():
         self.loss_log = open('loss_log', 'w')
         self.acc_log = open('acc_log', 'w')
 
-        self.input_size = 1024
-
         print 'batch size: {}, learning reate: {}, dropout: {}\n'.format(self.batch_size, self.lr, self.dropout)
 
 
-    def u_net(self, x, layers=4, base_channel=64):
+    def u_net(self, x, layers=7, base_channel=16):
         ds_layers = {}
+        ds_layer_shape = {}
 
         # down sample layers
         for layer in range(0, layers-1):
@@ -40,6 +39,7 @@ class UNET():
 
             x = conv2d(x, [3, 3, f_channels, f_channels], layer_name + '_2')
             ds_layers[layer] = x
+            ds_layer_shape[layer] = tf.shape(x)
 
             x = maxpooling(x)
 
@@ -52,7 +52,7 @@ class UNET():
         for layer in range(layers-2, -1, -1):
             f_channels = base_channel * (2**layer)
             layer_name = 'up_{}'.format(layer)
-            x = deconv2d(x, [3, 3, f_channels, 2*f_channels], layer_name + '_deconv2d')
+            x = deconv2d(x, [3, 3, f_channels, 2*f_channels], ds_layer_shape[layer], layer_name + '_deconv2d')
 
             # add the previous down sumple layer to the up sample layer
             x = concat(ds_layers[layer], x)
@@ -70,13 +70,14 @@ class UNET():
 
     def train(self, session):
         # train fcn
-        x = tf.placeholder(tf.float32, [self.batch_size, self.input_size, self.input_size, 3])
-        y = tf.placeholder(tf.float32, [self.batch_size, self.input_size, self.input_size])
+        x = tf.placeholder(tf.float32, [self.batch_size, 1280, 1918, 3])
+        y = tf.placeholder(tf.float32, [self.batch_size, 1280, 1918])
         net = self.u_net(x)
 
         # sigmoid cross entropy loss
-        loss_sum = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net), axis=[1, 2])
-        loss = tf.reduce_mean(loss_sum)
+        #loss_sum = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net), axis=[1, 2])
+        #loss = tf.reduce_mean(loss_sum)
+        loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net))
 
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
@@ -85,14 +86,14 @@ class UNET():
 
         train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(
             loss,
-            global_step=global_step,
-            aggregation_method=tf.AggregationMethod.EXPERIMENTAL_ACCUMULATE_N)
+            global_step=global_step
+        )
 
         saver = tf.train.Saver(max_to_keep=3)
 
         # evaluate fcn
         tf.get_variable_scope().reuse_variables()
-        eval_x = tf.placeholder(tf.float32, [1, self.input_size, self.input_size, 3])
+        eval_x = tf.placeholder(tf.float32, [1, 1280, 1918, 3])
         eval_net = tf.nn.sigmoid(self.u_net(eval_x))
 
         session.run(tf.global_variables_initializer())
@@ -224,10 +225,7 @@ class UNET():
         # remove the first dimension since the size is 1
         eval_out = np.squeeze(eval_out, axis=0)
 
-        height, width = eval_y.shape
-
-        eval_out = np.round(eval_out)
-        mask = cv2.resize(eval_out, (width, height), interpolation=cv2.INTER_CUBIC)
+        mask = np.round(eval_out)
         mask = np.round(mask).astype(np.int32)
 
         # calculate the iou accuracy

@@ -64,7 +64,6 @@ class DataGenerator():
             print i, img_path
             name = img_path.split('/')[-1]
             img = cv2.imread(img_path)
-            img = cv2.resize(img, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
             self.validate_images.append(img)
 
             mask_path = os.path.join(self.train_mask_dir, name.split('.')[0] + '_mask.gif')
@@ -75,7 +74,6 @@ class DataGenerator():
 
     def load_image_from_file(self, img_path, flip):
         img = cv2.imread(img_path)
-        img = cv2.resize(img, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
         if flip == 1:
             img = cv2.flip(img, 1)
         img = img/255.0
@@ -86,7 +84,6 @@ class DataGenerator():
         mask_path = os.path.join(self.train_mask_dir, name + '_mask.gif')
         im = Image.open(mask_path)
         mask = np.array(im)
-        mask = cv2.resize(mask, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
         mask = np.round(mask).astype(np.int32)
         if flip == 1:
             mask = cv2.flip(mask, 1)
@@ -103,13 +100,11 @@ class DataGenerator():
             print i, img_path
             name = img_path.split('/')[-1]
             img = cv2.imread(img_path)
-            img = cv2.resize(img, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
             self.train_images.append(img)
 
             mask_path = os.path.join(self.train_mask_dir, name.split('.')[0] + '_mask.gif')
             im = Image.open(mask_path)
             mask = np.array(im)
-            mask = cv2.resize(mask, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
             mask = np.round(mask).astype(np.int32)
             self.train_gt_masks.append(mask)
 
