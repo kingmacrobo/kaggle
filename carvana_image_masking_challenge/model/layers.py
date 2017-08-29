@@ -9,7 +9,7 @@ def bias_variable(shape):
     return tf.get_variable("biases", shape, initializer=tf.constant_initializer(0.1))
 
 # weight shape: [filter_h, filter_w, input_channels, output_channels]
-def conv2d(x, w_shape, scope, activation='relu', bn=False):
+def conv2d(x, w_shape, scope, activation='relu', bn=True):
     with tf.variable_scope(scope):
         w = weight_variable(w_shape)
         b = bias_variable([w_shape[-1]])
