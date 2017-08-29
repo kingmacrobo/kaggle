@@ -73,19 +73,23 @@ class DataGenerator():
             self.validate_gt_masks.append(mask)
         print 'Load validate images done! ^_^ \n'
 
-    def load_image_from_file(self, img_path):
+    def load_image_from_file(self, img_path, flip):
         img = cv2.imread(img_path)
         img = cv2.resize(img, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
+        if flip == 1:
+            img = cv2.flip(img, 1)
         img = img/255.0
         return img
 
-    def load_gt_mask_from_file(self, img_path):
+    def load_gt_mask_from_file(self, img_path, flip):
         name = img_path.split('/')[-1].split('.')[0]
         mask_path = os.path.join(self.train_mask_dir, name + '_mask.gif')
         im = Image.open(mask_path)
         mask = np.array(im)
         mask = cv2.resize(mask, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
         mask = np.round(mask).astype(np.int32)
+        if flip == 1:
+            mask = cv2.flip(mask, 1)
         return mask
 
     def load_train_images(self):
@@ -130,8 +134,10 @@ class DataGenerator():
                 gt_mask = self.train_gt_masks[index]
                 '''
                 img_path = self.train_list[index % len(self.train_list)]
-                img = self.load_image_from_file(img_path)
-                gt_mask = self.load_gt_mask_from_file(img_path)
+                flip = random.randint(0, 1)
+
+                img = self.load_image_from_file(img_path, flip)
+                gt_mask = self.load_gt_mask_from_file(img_path, flip)
                 index += 1
 
                 if self.debug:
