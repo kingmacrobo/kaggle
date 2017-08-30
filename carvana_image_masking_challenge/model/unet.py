@@ -3,13 +3,12 @@ import time
 import json
 import numpy as np
 import tensorflow as tf
-import cv2
 
 import tools
 from layers import conv2d, deconv2d, maxpooling, concat
 
 class UNET():
-    def __init__(self, datagen, batch_size=1, lr=0.0001, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
+    def __init__(self, datagen, batch_size=1, lr=0.00005, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
 
         self.datagen = datagen
         self.batch_size = batch_size
