@@ -1,5 +1,5 @@
 import tensorflow as tf
-import fcn
+import unet
 import data
 
 flags = tf.app.flags
@@ -16,9 +16,9 @@ FLAGS = flags.FLAGS
 def main():
     #datagen = data.DataGenerator(FLAGS.train_list, FLAGS.test_list, FLAGS.train_mask_dir, debug_dir=FLAGS.debug_dir)
     datagen = data.DataGenerator(FLAGS.train_list, FLAGS.test_list, FLAGS.train_mask_dir)
-    fcn_model = fcn.FCN(datagen, out_mask_dir=FLAGS.out_mask_dir, model_dir=FLAGS.model_dir)
+    model = unet.UNET(datagen, out_mask_dir=FLAGS.out_mask_dir, model_dir=FLAGS.model_dir)
     with tf.Session() as session:
-        fcn_model.train(session)
+        model.train(session)
 
 if __name__ == '__main__':
     main()

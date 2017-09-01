@@ -28,7 +28,7 @@ def mask_to_img(mask, out_dir, sample_name):
         os.mkdir(out_dir)
 
     dst = os.path.join(out_dir, sample_name + '_mask.gif')
-    mask = mask*255
+    mask = mask * 255
     Image.fromarray(mask).save(dst)
 
 
@@ -62,7 +62,7 @@ def main():
     a = sys.argv[1]
     b = sys.argv[2]
 
-    img_a = cv2.imread(a, cv2.IMREAD_GRAYSCALE)
+    img_a = np.array(Image.open(a))
     img_b = np.array(Image.open(b))
 
     print iou_check(img_a, img_b)
