@@ -9,7 +9,7 @@ def bias_variable(shape):
     return tf.get_variable("biases", shape, initializer=tf.constant_initializer(0.1))
 
 # weight shape: [filter_h, filter_w, input_channels, output_channels]
-def conv2d(x, w_shape, scope, activation='relu', bn=True):
+def conv2d(x, w_shape, scope, activation='relu', bn=False):
     with tf.variable_scope(scope):
         w = weight_variable(w_shape)
         b = bias_variable([w_shape[-1]])
@@ -25,8 +25,18 @@ def conv2d(x, w_shape, scope, activation='relu', bn=True):
             out_size = w_shape[-1]
             scale = tf.Variable(tf.ones([out_size]))
             shift = tf.Variable(tf.zeros([out_size]))
-            epsilon = 0.001
-            x = tf.nn.batch_normalization(x, fc_mean, fc_var, shift, scale, epsilon)
+            epsilon = 0.00001
+
+            # apply moving average for mean and var when train on batch
+            ema = tf.train.ExponentialMovingAverage(decay=0.5)
+
+            def mean_var_with_update():
+                ema_apply_op = ema.apply([fc_mean, fc_var])
+                with tf.control_dependencies([ema_apply_op]):
+                    return tf.identity(fc_mean), tf.identity(fc_var)
+
+            mean, var = mean_var_with_update()
+            x = tf.nn.batch_normalization(x, mean, var, shift, scale, epsilon)
 
         if activation == 'sigmoid':
             return tf.nn.sigmoid(x)

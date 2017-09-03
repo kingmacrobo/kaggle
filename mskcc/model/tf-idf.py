@@ -9,15 +9,15 @@ from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.svm import SVC
 
-TEST = True
+TEST = False
 
 # read data
 train_text = sys.argv[1]
 train_variant = sys.argv[2]
 
 if TEST:
-    test_test = sys.argv[3]
-    test_samples = pd.read_csv(train_text, sep="\|\|", engine='python', header=None, skiprows=1, names=["ID","Text"])
+    test_text = sys.argv[3]
+    test_samples = pd.read_csv(test_text, sep="\|\|", engine='python', header=None, skiprows=1, names=["ID","Text"])
 
 text = pd.read_csv(train_text, sep="\|\|", engine='python', header=None, skiprows=1, names=["ID","Text"])
 variant = pd.read_csv(train_variant, engine='python')
@@ -52,6 +52,8 @@ else:
 print 'fitting train samples'
 count_vect = CountVectorizer(stop_words='english', max_df=1.0)
 count_vect.fit(train_samples['Text'])
+print count_vect.get_feature_names()
+print count_vect.get_stop_words()
 X_train_counts = count_vect.transform(train_samples['Text'])
 if TEST:
     X_test_counts = count_vect.transform(test_samples['Text'])
@@ -83,7 +85,7 @@ if TEST:
     proba = clf.predict_proba(X_test_tfidf)
     submission = pd.DataFrame(proba, columns=['class' + str(c + 1) for c in range(9)])
     submission['ID'] = test_samples['ID'].values
-    submission.to_csv('submission_xgb.csv', index=False)
+    submission.to_csv('submission.csv', index=False)
 
 else:
     # evaluate on validate set

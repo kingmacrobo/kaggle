@@ -8,7 +8,7 @@ import tools
 from layers import conv2d, deconv2d, maxpooling, concat
 
 class UNET():
-    def __init__(self, datagen, batch_size=1, lr=0.00000001, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
+    def __init__(self, datagen, batch_size=1, lr=0.0001, dropout=0.5, model_dir='checkpoints', out_mask_dir= 'out_mask'):
 
         self.datagen = datagen
         self.batch_size = batch_size
@@ -74,9 +74,9 @@ class UNET():
         net = self.u_net(x)
 
         # sigmoid cross entropy loss
-        loss_sum = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net), axis=[1, 2])
-        loss = tf.reduce_mean(loss_sum)
-        #loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net))
+        #loss_sum = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net), axis=[1, 2])
+        #loss = tf.reduce_mean(loss_sum)
+        loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net))
 
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
