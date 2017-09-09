@@ -36,3 +36,23 @@ def maxpooling(x, k=2):
 
 def concat(x1,x2):
     return tf.concat([x1, x2], 3)
+
+def dice_coe(output, target, loss_type='sorensen', axis=[1,2,3], smooth=1e-5):
+    inse = tf.reduce_sum(output * target, axis=axis)
+    if loss_type == 'jaccard':
+        l = tf.reduce_sum(output * output, axis=axis)
+        r = tf.reduce_sum(target * target, axis=axis)
+    elif loss_type == 'sorensen':
+        l = tf.reduce_sum(output, axis=axis)
+        r = tf.reduce_sum(target, axis=axis)
+    else:
+        raise Exception("Unknow loss_type")
+    ## old axis=[0,1,2,3]
+    # dice = 2 * (inse) / (l + r)
+    # epsilon = 1e-5
+    # dice = tf.clip_by_value(dice, 0, 1.0-epsilon) # if all empty, dice = 1
+    ## new haodong
+    dice = (2. * inse + smooth) / (l + r + smooth)
+    ##
+    dice = tf.reduce_mean(dice)
+    return dice
