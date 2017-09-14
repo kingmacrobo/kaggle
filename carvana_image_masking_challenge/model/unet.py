@@ -9,7 +9,7 @@ import tools
 from layers import conv2d, deconv2d, maxpooling, concat, dice_coe
 
 class UNET():
-    def __init__(self, datagen, batch_size=1, lr=0.00001, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
+    def __init__(self, datagen, batch_size=1, lr=0.0001, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
 
         self.datagen = datagen
         self.batch_size = batch_size
@@ -76,13 +76,12 @@ class UNET():
         net = self.u_net(x)
 
         # sigmoid cross entropy loss
-        #loss_sum = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net), axis=[1, 2])
-        #loss = tf.reduce_mean(loss_sum)
+        loss_sum = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net), axis=[1, 2])
+        loss = tf.reduce_mean(loss_sum)
         #loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net))
 
         # dice loss
-        p = tf.nn.sigmoid(net)
-        loss = -dice_coe(p, y, axis=[1, 2], smooth=1)
+        #loss = -dice_coe(net, y, axis=[1, 2], smooth=1)
 
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
@@ -122,9 +121,7 @@ class UNET():
         total_loss = 0
         count = 0
         for step in xrange(last_step + 1, 100000000):
-            gd_a = time.time()
             batch_x, batch_y = generate_train_batch.next()
-            gd_b = time.time()
 
             tr_a = time.time()
             _, loss_out = session.run([train_step, loss], feed_dict={x: batch_x, y: batch_y})
@@ -133,7 +130,7 @@ class UNET():
             total_loss += loss_out
             count += 1
 
-            if step % 100 == 0:
+            if step % 20 == 0:
                 avg_loss = total_loss/count
                 print 'global step {}, epoch {}, step {}, loss {}, step train time: {:.2f} s'\
                     .format(step, step / 4493, step % 4493, avg_loss, tr_b - tr_a)
