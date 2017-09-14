@@ -7,7 +7,7 @@ from PIL import Image
 
 class DataGenerator():
 
-    def __init__(self, train_list_file, test_list_file, train_mask_dir, debug_dir=None, input_size=1024):
+    def __init__(self, train_list_file, test_list_file, train_mask_dir, debug_dir=None, input_size=1088):
 
         self.input_size = input_size
 
@@ -74,6 +74,7 @@ class DataGenerator():
 
     def load_image_from_file(self, img_path, flip):
         img = cv2.imread(img_path)
+        img = cv2.resize(img, (self.input_size, self.input_size), interpolation=cv2.INTER_AREA)
         if flip == 1:
             img = cv2.flip(img, 1)
         img = img/255.0
@@ -130,7 +131,6 @@ class DataGenerator():
                 '''
                 img_path = self.train_list[index % len(self.train_list)]
                 flip = random.randint(0, 1)
-
                 img = self.load_image_from_file(img_path, flip)
                 gt_mask = self.load_gt_mask_from_file(img_path, flip)
                 index += 1

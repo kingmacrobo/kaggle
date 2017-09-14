@@ -5,11 +5,10 @@ import numpy as np
 import tensorflow as tf
 
 import tools
-from layers import conv2d, deconv2d, maxpooling, concat
+from layers import conv2d, deconv2d, maxpooling, concat, dice_coe
 
 class UNET():
-    def __init__(self, datagen, batch_size=1, lr=0.0001, dropout=0.5, model_dir='checkpoints', out_mask_dir= 'out_mask'):
-
+    def __init__(self, datagen, batch_size=1, lr=0.0001, dropout=0.75, model_dir='checkpoints', out_mask_dir= 'out_mask'):
         self.datagen = datagen
         self.batch_size = batch_size
         self.lr = lr
@@ -19,11 +18,11 @@ class UNET():
         self.acc_file = os.path.join(self.model_dir, 'accuracy.json')
         self.loss_log = open('loss_log', 'w')
         self.acc_log = open('acc_log', 'w')
+        self.input_size = 1088
 
         print 'batch size: {}, learning reate: {}, dropout: {}\n'.format(self.batch_size, self.lr, self.dropout)
 
-
-    def u_net(self, x, layers=7, base_channel=16):
+    def u_net(self, x, layers=4, base_channel=64, train=True):
         ds_layers = {}
         ds_layer_shape = {}
 
@@ -58,7 +57,8 @@ class UNET():
 
             x = conv2d(x, [3, 3, 2*f_channels, f_channels], layer_name + '_conv_1')
             x = conv2d(x, [3, 3, f_channels, f_channels], layer_name + '_conv_2')
-            x = tf.nn.dropout(x, self.dropout)
+            #if train:
+            #    x = tf.nn.dropout(x, self.dropout)
 
         # add 1x1 convolution layer to change channel to one
         x = conv2d(x, [1, 1, base_channel, 1], 'conv_1x1', activation='no')
@@ -74,9 +74,12 @@ class UNET():
         net = self.u_net(x)
 
         # sigmoid cross entropy loss
-        #loss_sum = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net), axis=[1, 2])
-        #loss = tf.reduce_mean(loss_sum)
-        loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net))
+        loss_sum = tf.reduce_sum(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net), axis=[1, 2])
+        loss = tf.reduce_mean(loss_sum)
+        #loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(labels=y, logits=net))
+
+        # dice loss
+        #loss = -dice_coe(net, y, axis=[1, 2], smooth=1)
 
         global_step = tf.Variable(0, name='global_step', trainable=False)
 
@@ -85,15 +88,14 @@ class UNET():
 
         train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(
             loss,
-            global_step=global_step
-        )
+            global_step=global_step)
 
         saver = tf.train.Saver(max_to_keep=3)
 
         # evaluate fcn
         tf.get_variable_scope().reuse_variables()
-        eval_x = tf.placeholder(tf.float32, [1, 1280, 1918, 3])
-        eval_net = tf.nn.sigmoid(self.u_net(eval_x))
+        eval_x = tf.placeholder(tf.float32, [1, self.input_size, self.input_size, 3])
+        eval_net = tf.nn.sigmoid(self.u_net(eval_x, train=False))
 
         session.run(tf.global_variables_initializer())
 
@@ -117,9 +119,7 @@ class UNET():
         total_loss = 0
         count = 0
         for step in xrange(last_step + 1, 100000000):
-            gd_a = time.time()
             batch_x, batch_y = generate_train_batch.next()
-            gd_b = time.time()
 
             tr_a = time.time()
             _, loss_out = session.run([train_step, loss], feed_dict={x: batch_x, y: batch_y})
@@ -128,10 +128,10 @@ class UNET():
             total_loss += loss_out
             count += 1
 
-            if step % 10 == 0:
+            if step % 20 == 0:
                 avg_loss = total_loss/count
-                print 'global step {}, epoch {}, step {}, loss {}, generate data time: {:.2f} s, step train time: {:.2f} s'\
-                    .format(step, step / 4493, step % 4493, avg_loss, gd_b - gd_a, tr_b - tr_a)
+                print 'global step {}, epoch {}, step {}, loss {}, step train time: {:.2f} s'\
+                    .format(step, step / 4493, step % 4493, avg_loss, tr_b - tr_a)
                 self.loss_log.write('{} {}\n'.format(step, avg_loss))
                 total_loss = 0
                 count = 0
